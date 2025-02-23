@@ -5,6 +5,9 @@ section .data
     prompt_msg  db "Entrez 1 pour générer un mot de passe: "
     prompt_msg_len equ $ - prompt_msg
 
+    success_msg db "Mot de passe généré !", 10
+    success_msg_len equ $ - success_msg
+
     newline db 10
 
     ; Ensemble des caractères possibles (10 chiffres + 26 lettres majuscules + 26 lettres minuscules = 62 caractères)
@@ -18,14 +21,16 @@ section .bss
 
 section .text
     global _start
+
 _start:
-    ; Afficher le message de bienvenue
+    ; Afficher le message de bienvenue une seule fois
     mov rax, 1                  ; sys_write
     mov rdi, 1                  ; stdout
     mov rsi, welcome_msg
     mov rdx, welcome_msg_len
     syscall
 
+main_loop:
     ; Afficher le prompt
     mov rax, 1
     mov rdi, 1
@@ -43,7 +48,7 @@ _start:
     ; Vérifier si l'entrée est "1"
     mov al, byte [input_buffer]
     cmp al, '1'
-    jne exit_program            ; Si ce n'est pas "1", on quitte
+    jne main_loop              ; Sinon, on recommence
 
     ; Initialiser la graine avec le compteur du processeur (RDTSC)
     rdtsc                       ; RAX = partie basse, RDX = partie haute
@@ -64,7 +69,7 @@ gen_loop:
     mov [seed], rax
 
     ; Pour obtenir un index dans [0, 61] :
-    ; On décale de 16 bits (similaire à rand() en C) et on prend le modulo 62
+    ; On décale de 16 bits et on prend le modulo 62
     shr rax, 16
     mov rbx, 62
     xor rdx, rdx
@@ -83,11 +88,11 @@ gen_loop:
     ; Terminer la chaîne (optionnel)
     mov byte [rsi], 0
 
-    ; Afficher un retour à la ligne
+    ; Afficher le message de succès sur une ligne au-dessus
     mov rax, 1
     mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
+    mov rsi, success_msg
+    mov rdx, success_msg_len
     syscall
 
     ; Afficher le mot de passe généré (8 caractères)
@@ -97,8 +102,13 @@ gen_loop:
     mov rdx, 8
     syscall
 
-exit_program:
-    ; Quitter le programme
-    mov rax, 60                 ; sys_exit
-    xor rdi, rdi
+    ; Afficher un retour à la ligne
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
     syscall
+
+    jmp main_loop             ; Revenir au prompt pour une nouvelle génération
+
+; Le programme boucle indéfiniment. Pour l'arrêter, utilisez Ctrl+C.
