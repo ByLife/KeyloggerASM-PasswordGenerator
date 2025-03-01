@@ -7,6 +7,7 @@ section .data
                     "  medium   : Génère un mot de passe de 10 caractères (chiffres, lettres et caractères speciaux)", 10, \
                     "  hardcore : Génère un mot de passe de 20 caractères (chiffres, lettres et caractères speciaux)", 10, \
                     "  custom   : Génère un mot de passe sur mesure", 10, \
+                    "  help     : Affiche cette aide", 10, \
                     "  exit     : Quitte le programme", 10, 10
     commands_msg_len equ $ - commands_msg
 
@@ -41,6 +42,9 @@ section .data
 
     custom_str db "custom"
     custom_str_len equ $ - custom_str
+
+    help_str db "help"
+    help_str_len equ $ - help_str
 
     custom_length_prompt db "Entrez la longueur du mot de passe custom: ", 0
     custom_length_prompt_len equ $ - custom_length_prompt
@@ -88,13 +92,13 @@ section .text
     global _start
 
 _start:
-    mov rax, 1; welcome
+    mov rax, 1
     mov rdi, 1
     mov rsi, welcome_msg
     mov rdx, welcome_msg_len
     syscall
 
-    mov rax, 1; commandes
+    mov rax, 1
     mov rdi, 1
     mov rsi, commands_msg
     mov rdx, commands_msg_len
@@ -160,10 +164,25 @@ after_trim:
     cmp rcx, 0
     je gen_custom
 
+    mov rdi, input_buffer
+    mov rsi, help_str
+    mov rcx, help_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je print_help
+
     mov rax, 1
     mov rdi, 1
     mov rsi, unknown_cmd_msg
     mov rdx, unknown_cmd_msg_len
+    syscall
+    jmp main_loop
+
+print_help:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, commands_msg
+    mov rdx, commands_msg_len
     syscall
     jmp main_loop
 
