@@ -1,7 +1,9 @@
 section .data
+    ; message de bienvenue
     welcome_msg db "Bienvenue dans le générateur de mot de passe by LucMARTIN & Léo HAIDAR B-)", 10, 10
     welcome_msg_len equ $ - welcome_msg
 
+    ; liste des commandes disponibles
     commands_msg db "Commandes disponibles:", 10, \
                     "  simple   : Génère un mot de passe de 8 caractères (chiffres et lettres)", 10, \
                     "  medium   : Génère un mot de passe de 10 caractères (chiffres, lettres et caracteres speciaux)", 10, \
@@ -11,23 +13,29 @@ section .data
                     "  exit     : Quitte le programme", 10, 10
     commands_msg_len equ $ - commands_msg
 
+    ; prompt de commande
     prompt_msg  db "Entrez une commande: "
     prompt_msg_len equ $ - prompt_msg
 
+    ; message de succes
     success_msg db "Mot de passe généré !", 10
     success_msg_len equ $ - success_msg
 
+    ; message commande inconnue
     unknown_cmd_msg db "Commande inconnue !", 10, 10
     unknown_cmd_msg_len equ $ - unknown_cmd_msg
 
     newline db 10
 
+    ; ensemble de caracteres pour simple
     allowed_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     allowed_len equ $ - allowed_chars
 
+    ; ensemble de caracteres pour medium et hardcore
     allowed_medium_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()"
     allowed_medium_chars_len equ $ - allowed_medium_chars
 
+    ; chaines de commande
     exit_str   db "exit"
     exit_str_len equ $ - exit_str
 
@@ -46,30 +54,38 @@ section .data
     help_str db "help"
     help_str_len equ $ - help_str
 
+    ; prompt pour la longueur custom
     custom_length_prompt db "Entrez la longueur du mot de passe custom: ", 0
     custom_length_prompt_len equ $ - custom_length_prompt
 
+    ; prompt pour inclure les lettres minuscules
     custom_lowercase_prompt db "Inclure des lettres minuscules ? (oui/non): ", 0
     custom_lowercase_prompt_len equ $ - custom_lowercase_prompt
 
+    ; prompt pour inclure les lettres majuscules
     custom_uppercase_prompt db "Inclure des lettres majuscules ? (oui/non): ", 0
     custom_uppercase_prompt_len equ $ - custom_uppercase_prompt
 
+    ; prompt pour inclure les nombres
     custom_numbers_prompt db "Inclure des nombres ? (oui/non): ", 0
     custom_numbers_prompt_len equ $ - custom_numbers_prompt
 
+    ; prompt pour inclure les caracteres speciaux
     custom_special_prompt db "Inclure des caracteres speciaux ? (oui/non): ", 0
     custom_special_prompt_len equ $ - custom_special_prompt
 
+    ; message aucun caractere selectionne
     none_selected_msg db "Aucun caractere selectionne !", 10, 10
     none_selected_msg_len equ $ - none_selected_msg
 
+    ; chaines pour oui et non
     yes_str db "oui"
     yes_str_len equ $ - yes_str
 
     non_str db "non"
     non_str_len equ $ - non_str
 
+    ; ensembles de caracteres pour custom
     lowercase_chars db "abcdefghijklmnopqrstuvwxyz"
     lowercase_chars_len equ $ - lowercase_chars
 
@@ -82,16 +98,20 @@ section .data
     special_chars db "!@#$%^&*()"
     special_chars_len equ $ - special_chars
 
+    ; message d'erreur nombre invalide
     invalid_number_msg db "Ce n'est pas un nombre !", 10, 0
     invalid_number_msg_len equ $ - invalid_number_msg
 
+    ; message d'erreur champ vide pour nombre
     empty_number_msg db "Le champ ne doit pas etre vide !", 10, 0
     empty_number_msg_len equ $ - empty_number_msg
 
+    ; message d'erreur reponse invalide
     invalid_response_msg db "Reponse invalide !", 10, 0
     invalid_response_msg_len equ $ - invalid_response_msg
 
 section .bss
+    ; buffers pour la saisie et les mots de passe
     input_buffer resb 16
     simple_password_buffer resb 9
     medium_password_buffer resb 11
@@ -104,12 +124,14 @@ section .text
     global _start
 
 _start:
+    ; affichage du message de bienvenue
     mov rax, 1
     mov rdi, 1
     mov rsi, welcome_msg
     mov rdx, welcome_msg_len
     syscall
 
+    ; affichage de la liste des commandes
     mov rax, 1
     mov rdi, 1
     mov rsi, commands_msg
@@ -117,12 +139,14 @@ _start:
     syscall
 
 main_loop:
+    ; affichage du prompt de commande
     mov rax, 1
     mov rdi, 1
     mov rsi, prompt_msg
     mov rdx, prompt_msg_len
     syscall
 
+    ; lecture de la commande entree par l'utilisateur
     mov rax, 0
     mov rdi, 0
     mov rsi, input_buffer
@@ -142,6 +166,7 @@ not_newline:
     jmp trim_loop
 after_trim:
 
+    ; verification si la commande est exit
     mov rdi, input_buffer
     mov rsi, exit_str
     mov rcx, exit_str_len
@@ -149,6 +174,7 @@ after_trim:
     cmp rcx, 0
     je exit_program
 
+    ; verification de la commande simple
     mov rdi, input_buffer
     mov rsi, simple_str
     mov rcx, simple_str_len
@@ -156,6 +182,7 @@ after_trim:
     cmp rcx, 0
     je gen_simple
 
+    ; verification de la commande medium
     mov rdi, input_buffer
     mov rsi, medium_str
     mov rcx, medium_str_len
@@ -163,6 +190,7 @@ after_trim:
     cmp rcx, 0
     je gen_medium
 
+    ; verification de la commande hardcore
     mov rdi, input_buffer
     mov rsi, hardcore_str
     mov rcx, hardcore_str_len
@@ -170,6 +198,7 @@ after_trim:
     cmp rcx, 0
     je gen_hardcore
 
+    ; verification de la commande custom
     mov rdi, input_buffer
     mov rsi, custom_str
     mov rcx, custom_str_len
@@ -177,6 +206,7 @@ after_trim:
     cmp rcx, 0
     je gen_custom
 
+    ; verification de la commande help
     mov rdi, input_buffer
     mov rsi, help_str
     mov rcx, help_str_len
@@ -184,6 +214,7 @@ after_trim:
     cmp rcx, 0
     je print_help
 
+    ; affichage du message de commande inconnue
     mov rax, 1
     mov rdi, 1
     mov rsi, unknown_cmd_msg
@@ -192,6 +223,7 @@ after_trim:
     jmp main_loop
 
 print_help:
+    ; affiche la liste des commandes
     mov rax, 1
     mov rdi, 1
     mov rsi, commands_msg
@@ -200,6 +232,7 @@ print_help:
     jmp main_loop
 
 gen_simple:
+    ; generation du mot de passe simple
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -224,6 +257,7 @@ simple_loop:
     inc rsi
     loop simple_loop
     mov byte [rsi], 0
+    ; affichage du resultat simple
     mov rax, 1
     mov rdi, 1
     mov rsi, newline
@@ -257,6 +291,7 @@ simple_loop:
     jmp main_loop
 
 gen_medium:
+    ; generation du mot de passe medium
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -281,6 +316,7 @@ medium_loop:
     inc rsi
     loop medium_loop
     mov byte [rsi], 0
+    ; affichage du resultat medium
     mov rax, 1
     mov rdi, 1
     mov rsi, newline
@@ -314,6 +350,7 @@ medium_loop:
     jmp main_loop
 
 gen_hardcore:
+    ; generation du mot de passe hardcore
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -338,6 +375,7 @@ hardcore_loop:
     inc rsi
     loop hardcore_loop
     mov byte [rsi], 0
+    ; affichage du resultat hardcore
     mov rax, 1
     mov rdi, 1
     mov rsi, newline
@@ -371,13 +409,14 @@ hardcore_loop:
     jmp main_loop
 
 gen_custom:
-    ; Demande de la longueur custom
+    ; demande de la longueur custom
 custom_length_input:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_length_prompt
     mov rdx, custom_length_prompt_len
     syscall
+    ; lecture de la longueur custom
     mov rax, 0
     mov rdi, 0
     mov rsi, input_buffer
@@ -396,6 +435,9 @@ custom_length_not_newline:
     dec rbx
     jmp custom_length_trim
 custom_length_conv:
+    ; verifie si le champ est vide
+    cmp byte [input_buffer], 0
+    je custom_empty_input
     xor rax, rax
     xor rcx, rcx
 custom_conv_loop:
@@ -420,13 +462,12 @@ custom_conv_invalid:
     syscall
     jmp custom_length_input
 custom_conv_done:
-    cmp rcx, 0
-    je custom_empty_input
     mov r9, rax
 
+    ; initialisation du charset custom
     mov r8, custom_charset
 
-    ; Minuscules
+    ; demande pour lettres minuscules
 lowercase_loop:
     mov rax, 1
     mov rdi, 1
@@ -463,6 +504,7 @@ lowercase_check:
     repe cmpsb
     cmp rcx, 0
     je set_lowercase_no
+    ; ce commantaire contient une faute intentionnelle
     mov rax, 1
     mov rdi, 1
     mov rsi, invalid_response_msg
@@ -477,7 +519,7 @@ set_lowercase_yes:
     mov r8, rdi
 set_lowercase_no:
 
-    ; Majuscules
+    ; demande pour lettres majuscules
 uppercase_loop:
     mov rax, 1
     mov rdi, 1
@@ -528,7 +570,7 @@ set_uppercase_yes:
     mov r8, rdi
 set_uppercase_no:
 
-    ; Nombres
+    ; demande pour nombres
 numbers_loop:
     mov rax, 1
     mov rdi, 1
@@ -579,7 +621,7 @@ set_numbers_yes:
     mov r8, rdi
 set_numbers_no:
 
-    ; Caracteres speciaux
+    ; demande pour caracteres speciaux
 special_loop:
     mov rax, 1
     mov rdi, 1
@@ -630,11 +672,13 @@ set_special_yes:
     mov r8, rdi
 set_special_no:
 
+    ; verifie que le charset custom n'est pas vide
     mov rax, r8
     sub rax, custom_charset
     cmp rax, 0
     je custom_no_charset
 
+    ; generation du mot de passe custom
     mov r10, rax
     rdtsc
     mov rbx, rdx
@@ -662,6 +706,7 @@ custom_gen_loop:
     jmp custom_gen_loop
 custom_gen_done:
     mov byte [custom_password_buffer + rcx], 0
+    ; affichage du mot de passe custom genere
     mov rax, 1
     mov rdi, 1
     mov rsi, newline
@@ -695,6 +740,7 @@ custom_gen_done:
     jmp main_loop
 
 custom_empty_input:
+    ; champ vide pour la longueur custom
     mov rax, 1
     mov rdi, 1
     mov rsi, empty_number_msg
@@ -703,6 +749,7 @@ custom_empty_input:
     jmp custom_length_input
 
 custom_no_charset:
+    ; aucun charset selectionne
     mov rax, 1
     mov rdi, 1
     mov rsi, none_selected_msg
@@ -711,6 +758,7 @@ custom_no_charset:
     jmp main_loop
 
 exit_program:
+    ; fin du programme
     mov rax, 60
     xor rdi, rdi
     syscall
