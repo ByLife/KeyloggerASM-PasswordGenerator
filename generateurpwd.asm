@@ -85,6 +85,9 @@ section .data
     invalid_number_msg db "Ce n'est pas un nombre !", 10, 0
     invalid_number_msg_len equ $ - invalid_number_msg
 
+    empty_number_msg db "Le champ ne doit pas etre vide !", 10, 0
+    empty_number_msg_len equ $ - empty_number_msg
+
     invalid_response_msg db "Reponse invalide !", 10, 0
     invalid_response_msg_len equ $ - invalid_response_msg
 
@@ -101,7 +104,6 @@ section .text
     global _start
 
 _start:
-    ; Affichage initial
     mov rax, 1
     mov rdi, 1
     mov rsi, welcome_msg
@@ -369,7 +371,7 @@ hardcore_loop:
     jmp main_loop
 
 gen_custom:
-    ; Récupération de la longueur custom (boucle jusqu'à saisie valide)
+    ; Demande de la longueur custom
 custom_length_input:
     mov rax, 1
     mov rdi, 1
@@ -418,12 +420,13 @@ custom_conv_invalid:
     syscall
     jmp custom_length_input
 custom_conv_done:
+    cmp rcx, 0
+    je custom_empty_input
     mov r9, rax
 
-    ; Initialiser le charset custom
     mov r8, custom_charset
 
-    ; Boucle pour minuscules
+    ; Minuscules
 lowercase_loop:
     mov rax, 1
     mov rdi, 1
@@ -474,7 +477,7 @@ set_lowercase_yes:
     mov r8, rdi
 set_lowercase_no:
 
-    ; Boucle pour majuscules
+    ; Majuscules
 uppercase_loop:
     mov rax, 1
     mov rdi, 1
@@ -525,7 +528,7 @@ set_uppercase_yes:
     mov r8, rdi
 set_uppercase_no:
 
-    ; Boucle pour nombres
+    ; Nombres
 numbers_loop:
     mov rax, 1
     mov rdi, 1
@@ -576,7 +579,7 @@ set_numbers_yes:
     mov r8, rdi
 set_numbers_no:
 
-    ; Boucle pour caracteres speciaux
+    ; Caracteres speciaux
 special_loop:
     mov rax, 1
     mov rdi, 1
@@ -627,14 +630,12 @@ set_special_yes:
     mov r8, rdi
 set_special_no:
 
-    ; Si aucun charset n'est selectionne
     mov rax, r8
     sub rax, custom_charset
     cmp rax, 0
     je custom_no_charset
 
-    ; Generation du mot de passe custom
-    mov r10, rax  ; taille du charset
+    mov r10, rax
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -692,6 +693,14 @@ custom_gen_done:
     mov rdx, 1
     syscall
     jmp main_loop
+
+custom_empty_input:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, empty_number_msg
+    mov rdx, empty_number_msg_len
+    syscall
+    jmp custom_length_input
 
 custom_no_charset:
     mov rax, 1
