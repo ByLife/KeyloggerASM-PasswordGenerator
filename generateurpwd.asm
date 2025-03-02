@@ -4,8 +4,8 @@ section .data
 
     commands_msg db "Commandes disponibles:", 10, \
                     "  simple   : Génère un mot de passe de 8 caractères (chiffres et lettres)", 10, \
-                    "  medium   : Génère un mot de passe de 10 caractères (chiffres, lettres et caractères speciaux)", 10, \
-                    "  hardcore : Génère un mot de passe de 20 caractères (chiffres, lettres et caractères speciaux)", 10, \
+                    "  medium   : Génère un mot de passe de 10 caractères (chiffres, lettres et caracteres speciaux)", 10, \
+                    "  hardcore : Génère un mot de passe de 20 caractères (chiffres, lettres et caracteres speciaux)", 10, \
                     "  custom   : Génère un mot de passe sur mesure", 10, \
                     "  help     : Affiche cette aide", 10, \
                     "  exit     : Quitte le programme", 10, 10
@@ -67,6 +67,9 @@ section .data
     yes_str db "oui"
     yes_str_len equ $ - yes_str
 
+    non_str db "non"
+    non_str_len equ $ - non_str
+
     lowercase_chars db "abcdefghijklmnopqrstuvwxyz"
     lowercase_chars_len equ $ - lowercase_chars
 
@@ -78,6 +81,12 @@ section .data
 
     special_chars db "!@#$%^&*()"
     special_chars_len equ $ - special_chars
+
+    invalid_number_msg db "Ce n'est pas un nombre !", 10, 0
+    invalid_number_msg_len equ $ - invalid_number_msg
+
+    invalid_response_msg db "Reponse invalide !", 10, 0
+    invalid_response_msg_len equ $ - invalid_response_msg
 
 section .bss
     input_buffer resb 16
@@ -92,6 +101,7 @@ section .text
     global _start
 
 _start:
+    ; Affichage initial
     mov rax, 1
     mov rdi, 1
     mov rsi, welcome_msg
@@ -129,6 +139,7 @@ not_newline:
     dec rbx
     jmp trim_loop
 after_trim:
+
     mov rdi, input_buffer
     mov rsi, exit_str
     mov rcx, exit_str_len
@@ -358,6 +369,8 @@ hardcore_loop:
     jmp main_loop
 
 gen_custom:
+    ; Récupération de la longueur custom (boucle jusqu'à saisie valide)
+custom_length_input:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_length_prompt
@@ -370,17 +383,17 @@ gen_custom:
     syscall
     mov rbx, rax
     mov rdi, input_buffer
-custom_trim_loop:
+custom_length_trim:
     cmp rbx, 0
-    je custom_after_trim
+    je custom_length_conv
     cmp byte [rdi], 10
-    jne custom_not_newline
+    jne custom_length_not_newline
     mov byte [rdi], 0
-custom_not_newline:
+custom_length_not_newline:
     inc rdi
     dec rbx
-    jmp custom_trim_loop
-custom_after_trim:
+    jmp custom_length_trim
+custom_length_conv:
     xor rax, rax
     xor rcx, rcx
 custom_conv_loop:
@@ -388,20 +401,30 @@ custom_conv_loop:
     cmp bl, 0
     je custom_conv_done
     cmp bl, '0'
-    jb custom_conv_done
+    jb custom_conv_invalid
     cmp bl, '9'
-    ja custom_conv_done
+    ja custom_conv_invalid
     imul rax, rax, 10
     sub bl, '0'
     movzx rbx, bl
     add rax, rbx
     inc rcx
     jmp custom_conv_loop
+custom_conv_invalid:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_number_msg
+    mov rdx, invalid_number_msg_len
+    syscall
+    jmp custom_length_input
 custom_conv_done:
     mov r9, rax
 
+    ; Initialiser le charset custom
     mov r8, custom_charset
 
+    ; Boucle pour minuscules
+lowercase_loop:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_lowercase_prompt
@@ -414,29 +437,45 @@ custom_conv_done:
     syscall
     mov rbx, rax
     mov rdi, input_buffer
-custom_trim_loop2:
+lowercase_trim:
     cmp rbx, 0
-    je custom_after_trim2
+    je lowercase_check
     cmp byte [rdi], 10
-    jne custom_not_newline2
+    jne lowercase_not_newline
     mov byte [rdi], 0
-custom_not_newline2:
+lowercase_not_newline:
     inc rdi
     dec rbx
-    jmp custom_trim_loop2
-custom_after_trim2:
+    jmp lowercase_trim
+lowercase_check:
     mov rdi, input_buffer
     mov rsi, yes_str
     mov rcx, yes_str_len
     repe cmpsb
     cmp rcx, 0
-    jne custom_skip_lowercase
+    je set_lowercase_yes
+    mov rdi, input_buffer
+    mov rsi, non_str
+    mov rcx, non_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je set_lowercase_no
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_response_msg
+    mov rdx, invalid_response_msg_len
+    syscall
+    jmp lowercase_loop
+set_lowercase_yes:
     mov rdi, r8
     mov rcx, lowercase_chars_len
     mov rsi, lowercase_chars
     rep movsb
     mov r8, rdi
-custom_skip_lowercase:
+set_lowercase_no:
+
+    ; Boucle pour majuscules
+uppercase_loop:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_uppercase_prompt
@@ -449,29 +488,45 @@ custom_skip_lowercase:
     syscall
     mov rbx, rax
     mov rdi, input_buffer
-custom_trim_loop3:
+uppercase_trim:
     cmp rbx, 0
-    je custom_after_trim3
+    je uppercase_check
     cmp byte [rdi], 10
-    jne custom_not_newline3
+    jne uppercase_not_newline
     mov byte [rdi], 0
-custom_not_newline3:
+uppercase_not_newline:
     inc rdi
     dec rbx
-    jmp custom_trim_loop3
-custom_after_trim3:
+    jmp uppercase_trim
+uppercase_check:
     mov rdi, input_buffer
     mov rsi, yes_str
     mov rcx, yes_str_len
     repe cmpsb
     cmp rcx, 0
-    jne custom_skip_uppercase
+    je set_uppercase_yes
+    mov rdi, input_buffer
+    mov rsi, non_str
+    mov rcx, non_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je set_uppercase_no
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_response_msg
+    mov rdx, invalid_response_msg_len
+    syscall
+    jmp uppercase_loop
+set_uppercase_yes:
     mov rdi, r8
     mov rcx, uppercase_chars_len
     mov rsi, uppercase_chars
     rep movsb
     mov r8, rdi
-custom_skip_uppercase:
+set_uppercase_no:
+
+    ; Boucle pour nombres
+numbers_loop:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_numbers_prompt
@@ -484,29 +539,45 @@ custom_skip_uppercase:
     syscall
     mov rbx, rax
     mov rdi, input_buffer
-custom_trim_loop4:
+numbers_trim:
     cmp rbx, 0
-    je custom_after_trim4
+    je numbers_check
     cmp byte [rdi], 10
-    jne custom_not_newline4
+    jne numbers_not_newline
     mov byte [rdi], 0
-custom_not_newline4:
+numbers_not_newline:
     inc rdi
     dec rbx
-    jmp custom_trim_loop4
-custom_after_trim4:
+    jmp numbers_trim
+numbers_check:
     mov rdi, input_buffer
     mov rsi, yes_str
     mov rcx, yes_str_len
     repe cmpsb
     cmp rcx, 0
-    jne custom_skip_numbers
+    je set_numbers_yes
+    mov rdi, input_buffer
+    mov rsi, non_str
+    mov rcx, non_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je set_numbers_no
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_response_msg
+    mov rdx, invalid_response_msg_len
+    syscall
+    jmp numbers_loop
+set_numbers_yes:
     mov rdi, r8
     mov rcx, numbers_chars_len
     mov rsi, numbers_chars
     rep movsb
     mov r8, rdi
-custom_skip_numbers:
+set_numbers_no:
+
+    ; Boucle pour caracteres speciaux
+special_loop:
     mov rax, 1
     mov rdi, 1
     mov rsi, custom_special_prompt
@@ -519,34 +590,51 @@ custom_skip_numbers:
     syscall
     mov rbx, rax
     mov rdi, input_buffer
-custom_trim_loop5:
+special_trim:
     cmp rbx, 0
-    je custom_after_trim5
+    je special_check
     cmp byte [rdi], 10
-    jne custom_not_newline5
+    jne special_not_newline
     mov byte [rdi], 0
-custom_not_newline5:
+special_not_newline:
     inc rdi
     dec rbx
-    jmp custom_trim_loop5
-custom_after_trim5:
+    jmp special_trim
+special_check:
     mov rdi, input_buffer
     mov rsi, yes_str
     mov rcx, yes_str_len
     repe cmpsb
     cmp rcx, 0
-    jne custom_skip_special
+    je set_special_yes
+    mov rdi, input_buffer
+    mov rsi, non_str
+    mov rcx, non_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je set_special_no
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_response_msg
+    mov rdx, invalid_response_msg_len
+    syscall
+    jmp special_loop
+set_special_yes:
     mov rdi, r8
     mov rcx, special_chars_len
     mov rsi, special_chars
     rep movsb
     mov r8, rdi
-custom_skip_special:
+set_special_no:
+
+    ; Si aucun charset n'est selectionne
     mov rax, r8
     sub rax, custom_charset
     cmp rax, 0
     je custom_no_charset
-    mov r10, rax
+
+    ; Generation du mot de passe custom
+    mov r10, rax  ; taille du charset
     rdtsc
     mov rbx, rdx
     shl rbx, 32
