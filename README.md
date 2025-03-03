@@ -2,6 +2,10 @@
 
 Ce dépôt contient une collection d'outils de sécurité système développés à des fins éducatives et de recherche en sécurité informatique.
 
+## Video
+
+[![Vidéo de présentation](video.mp4)]
+
 ## Composants du projet
 
 Ce projet comprend deux outils principaux :
