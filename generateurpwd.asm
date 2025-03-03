@@ -14,6 +14,7 @@ section .data
                     "  hardcore : Génère un mot de passe de 20 caractères (chiffres, lettres et caracteres speciaux)", 10, \
                     "  custom   : Génère un mot de passe sur mesure", 10, \
                     "  vault    : Affiche le vault (mots de passe sauvegardés)", 10, \
+                    "  vault delete : Vide le vault", 10, \
                     "  help     : Affiche cette aide", 10, \
                     "  exit     : Quitte le programme", 10, 10
     commands_msg_len equ $ - commands_msg
@@ -60,6 +61,10 @@ section .data
     vault_str db "vault", 0
     vault_str_len equ $ - vault_str - 1
 
+    ; Nouvelle chaîne pour la commande "vault delete"
+    vault_delete_str db "vault delete", 0
+    vault_delete_str_len equ $ - vault_delete_str - 1
+
     vault_save_prompt db "Voulez-vous sauvegarder ce mot de passe ? (oui/non): ", 0
     vault_save_prompt_len equ $ - vault_save_prompt
 
@@ -71,6 +76,10 @@ section .data
 
     separator_str db " : ", 0
     separator_str_len equ $ - separator_str
+
+    ; Message affiché lors du vidage du vault
+    vault_deleted_msg db "Vault vide!", 10, 0
+    vault_deleted_msg_len equ $ - vault_deleted_msg
 
     custom_length_prompt db "Entrez la longueur du mot de passe custom: ", 0
     custom_length_prompt_len equ $ - custom_length_prompt
@@ -136,9 +145,9 @@ section .bss
 section .text
     global _start, exit_program, display_result
 
-;-----------------------------------------------------------
+
 ; Routine de chargement du vault depuis le fichier
-;-----------------------------------------------------------
+
 load_vault:
     ; ouverture du fichier en lecture seule (syscall 2)
     mov rax, 2
@@ -164,9 +173,8 @@ load_vault:
 load_vault_end:
     ret
 
-;-----------------------------------------------------------
 ; Début du programme
-;-----------------------------------------------------------
+
 _start:
     ; chargement du vault depuis le fichier
     call load_vault
@@ -260,7 +268,15 @@ after_trim:
     cmp rcx, 0
     je print_help
 
-    ; vérification de la commande vault
+    ; vérification de la commande "vault delete" (prioritaire avant "vault")
+    mov rdi, input_buffer
+    mov rsi, vault_delete_str
+    mov rcx, vault_delete_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je vault_delete
+
+    ; vérification de la commande vault (affichage)
     mov rdi, input_buffer
     mov rsi, vault_str
     mov rcx, vault_str_len
@@ -285,9 +301,9 @@ print_help:
     syscall
     jmp main_loop
 
-;-----------------------------------------------------------
+
 ; Génération des mots de passe
-;-----------------------------------------------------------
+
 gen_simple:
     rdtsc
     mov rbx, rdx
@@ -704,10 +720,10 @@ exit_program:
     xor rdi, rdi
     syscall
 
-;-----------------------------------------------------------
+
 ; Fonction d'affichage du résultat
 ; rdi = pointeur du mot de passe, rsi = longueur
-;-----------------------------------------------------------
+
 display_result:
     mov r8, rdi
     mov r9, rsi
@@ -743,10 +759,9 @@ display_result:
     syscall
     ret
 
-;-----------------------------------------------------------
 ; Fonction Vault : demande si on sauvegarde le mot de passe,
 ; ajoute une entrée au vault en mémoire ET dans le fichier
-;-----------------------------------------------------------
+
 vault_prompt:
     cld
     ; affichage du prompt de sauvegarde
@@ -875,13 +890,12 @@ vault_copy_newline:
 vault_prompt_end:
     ret
 
-;-----------------------------------------------------------
 ; Routine d'écriture de la nouvelle entrée dans le fichier vault.txt
 ; Ouvre le fichier en mode append et écrit les données passées en rsi (taille en rdx)
-;-----------------------------------------------------------
+
 vault_save_to_file:
     ; Sauvegarde le pointeur et la taille dans r12 et r13
-    mov r12, rsi    ; r12 = pointer vers l'entrée à écrire
+    mov r12, rsi    ; r12 = pointeur vers l'entrée à écrire
     mov r13, rdx    ; r13 = taille de l'entrée
     ; ouverture du fichier avec : O_WRONLY | O_APPEND | O_CREAT = 1089
     mov rax, 2
@@ -891,7 +905,7 @@ vault_save_to_file:
     syscall
     cmp rax, 0
     jl vault_save_end
-    mov rbx, rax       ; sauvegarde du FD dans rbx
+    mov rbx, rax       ; FD sauvegardé dans rbx
     ; restauration des paramètres d'écriture
     mov rsi, r12
     mov rdx, r13
@@ -906,9 +920,37 @@ vault_save_to_file:
 vault_save_end:
     ret
 
-;-----------------------------------------------------------
+
+; Nouvelle routine : Vider le vault
+
+vault_delete:
+    ; Ouvre le fichier en écriture avec troncation : O_WRONLY|O_TRUNC|O_CREAT = 577 (1+512+64)
+    mov rax, 2
+    mov rdi, vault_filename
+    mov rsi, 577      ; O_WRONLY | O_TRUNC | O_CREAT
+    mov rdx, 420      ; mode 0644
+    syscall
+    cmp rax, 0
+    jl vault_delete_end
+    mov rbx, rax
+    ; ferme le fichier
+    mov rax, 3
+    mov rdi, rbx
+    syscall
+vault_delete_end:
+    ; remet à zéro le vault en mémoire
+    mov qword [vault_offset], 0
+    ; affiche un message de confirmation
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, vault_deleted_msg
+    mov rdx, vault_deleted_msg_len
+    syscall
+    jmp main_loop
+
+
 ; Affiche toutes les entrées sauvegardées dans le vault (en mémoire)
-;-----------------------------------------------------------
+
 show_vault:
     mov rax, [vault_offset]
     cmp rax, 0
