@@ -9,6 +9,7 @@ section .data
                     "  medium   : Génère un mot de passe de 10 caractères (chiffres, lettres et caracteres speciaux)", 10, \
                     "  hardcore : Génère un mot de passe de 20 caractères (chiffres, lettres et caracteres speciaux)", 10, \
                     "  custom   : Génère un mot de passe sur mesure", 10, \
+                    "  vault    : Affiche le vault (mot de passe sauvegardés)", 10, \
                     "  help     : Affiche cette aide", 10, \
                     "  exit     : Quitte le programme", 10, 10
     commands_msg_len equ $ - commands_msg
@@ -52,6 +53,23 @@ section .data
 
     help_str db "help", 0
     help_str_len equ $ - help_str - 1
+
+    ; --- Ajouts pour le vault ---
+    vault_str db "vault", 0
+    vault_str_len equ $ - vault_str - 1
+
+    vault_save_prompt db "Voulez-vous sauvegarder ce mot de passe ? (oui/non): ", 0
+    vault_save_prompt_len equ $ - vault_save_prompt
+
+    vault_name_prompt db "Entrez un nom pour le mot de passe: ", 0
+    vault_name_prompt_len equ $ - vault_name_prompt
+
+    empty_vault_msg db "Aucun mot de passe sauvegarde.", 10, 0
+    empty_vault_msg_len equ $ - empty_vault_msg
+
+    separator_str db " : ", 0
+    separator_str_len equ $ - separator_str
+    ; --- Fin des ajouts pour le vault ---
 
     custom_length_prompt db "Entrez la longueur du mot de passe custom: ", 0
     custom_length_prompt_len equ $ - custom_length_prompt
@@ -107,6 +125,14 @@ section .bss
     custom_password_buffer resb 256
     seed resq 1
 
+    ; --- Variables pour le vault ---
+    name_input resb 64               ; tampon pour le nom saisi
+    vault_storage resb 1024            ; espace mémoire pour stocker les entrées du vault
+    vault_offset resq 1                ; offset courant dans vault_storage
+    last_password_ptr resq 1           ; pointeur sur le dernier mot de passe généré
+    last_password_len resq 1           ; longueur du dernier mot de passe généré
+    ; --- Fin des variables pour le vault ---
+
 section .text
     global _start, exit_program, display_result
 
@@ -133,7 +159,7 @@ main_loop:
     mov rdx, prompt_msg_len
     syscall
 
-    ; lecture de la commande entree
+    ; lecture de la commande entrée
     mov rax, 0
     mov rdi, 0
     mov rsi, input_buffer
@@ -152,7 +178,7 @@ not_newline:
     dec rbx
     jmp trim_loop
 after_trim:
-    ; verification de la commande exit
+    ; vérification de la commande exit
     mov rdi, input_buffer
     mov rsi, exit_str
     mov rcx, exit_str_len
@@ -160,7 +186,7 @@ after_trim:
     cmp rcx, 0
     je exit_program
 
-    ; verification de la commande simple
+    ; vérification de la commande simple
     mov rdi, input_buffer
     mov rsi, simple_str
     mov rcx, simple_str_len
@@ -168,7 +194,7 @@ after_trim:
     cmp rcx, 0
     je gen_simple
 
-    ; verification de la commande medium
+    ; vérification de la commande medium
     mov rdi, input_buffer
     mov rsi, medium_str
     mov rcx, medium_str_len
@@ -176,7 +202,7 @@ after_trim:
     cmp rcx, 0
     je gen_medium
 
-    ; verification de la commande hardcore
+    ; vérification de la commande hardcore
     mov rdi, input_buffer
     mov rsi, hardcore_str
     mov rcx, hardcore_str_len
@@ -184,7 +210,7 @@ after_trim:
     cmp rcx, 0
     je gen_hardcore
 
-    ; verification de la commande custom
+    ; vérification de la commande custom
     mov rdi, input_buffer
     mov rsi, custom_str
     mov rcx, custom_str_len
@@ -192,13 +218,21 @@ after_trim:
     cmp rcx, 0
     je gen_custom
 
-    ; verification de la commande help
+    ; vérification de la commande help
     mov rdi, input_buffer
     mov rsi, help_str
     mov rcx, help_str_len
     repe cmpsb
     cmp rcx, 0
     je print_help
+
+    ; vérification de la commande vault
+    mov rdi, input_buffer
+    mov rsi, vault_str
+    mov rcx, vault_str_len
+    repe cmpsb
+    cmp rcx, 0
+    je show_vault
 
     ; commande inconnue
     mov rax, 1
@@ -218,7 +252,7 @@ print_help:
     jmp main_loop
 
 gen_simple:
-    ; generation du mot de passe simple
+    ; génération du mot de passe simple
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -243,14 +277,18 @@ simple_loop:
     inc rsi
     loop simple_loop
     mov byte [rsi], 0
-    ; appel de la fonction d'affichage du resultat
+    ; sauvegarde du pointeur et de la longueur pour le vault
+    mov qword [last_password_ptr], simple_password_buffer
+    mov qword [last_password_len], 8
+    ; affichage du résultat
     mov rdi, simple_password_buffer
     mov rsi, 8
     call display_result
+    call vault_prompt
     jmp main_loop
 
 gen_medium:
-    ; generation du mot de passe medium
+    ; génération du mot de passe medium
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -275,14 +313,16 @@ medium_loop:
     inc rsi
     loop medium_loop
     mov byte [rsi], 0
-    ; appel de la fonction d'affichage du resultat
+    mov qword [last_password_ptr], medium_password_buffer
+    mov qword [last_password_len], 10
     mov rdi, medium_password_buffer
     mov rsi, 10
     call display_result
+    call vault_prompt
     jmp main_loop
 
 gen_hardcore:
-    ; generation du mot de passe hardcore
+    ; génération du mot de passe hardcore
     rdtsc
     mov rbx, rdx
     shl rbx, 32
@@ -307,14 +347,16 @@ hardcore_loop:
     inc rsi
     loop hardcore_loop
     mov byte [rsi], 0
-    ; appel de la fonction d'affichage du resultat
+    mov qword [last_password_ptr], hardcore_password_buffer
+    mov qword [last_password_len], 20
     mov rdi, hardcore_password_buffer
     mov rsi, 20
     call display_result
+    call vault_prompt
     jmp main_loop
 
 gen_custom:
-    ; demande de la longueur custom
+    ; génération du mot de passe custom
 custom_length_input:
     mov rax, 1
     mov rdi, 1
@@ -340,7 +382,7 @@ custom_length_not_newline:
     dec rbx
     jmp custom_length_trim
 custom_length_conv:
-    ; verifie si le champ est vide
+    ; vérifie si le champ est vide
     cmp byte [input_buffer], 0
     je custom_empty_input
     xor rax, rax
@@ -576,12 +618,12 @@ set_special_yes:
     rep movsb
     mov r8, rdi
 set_special_no:
-    ; verifie que le charset custom n'est pas vide
+    ; vérifie que le charset custom n'est pas vide
     mov rax, r8
     sub rax, custom_charset
     cmp rax, 0
     je custom_no_charset
-    ; generation du mot de passe custom
+    ; génération du mot de passe custom
     mov r10, rax
     rdtsc
     mov rbx, rdx
@@ -609,10 +651,12 @@ custom_gen_loop:
     jmp custom_gen_loop
 custom_gen_done:
     mov byte [custom_password_buffer + rcx], 0
-    ; appel de la fonction d'affichage du resultat final
+    mov qword [last_password_ptr], custom_password_buffer
+    mov qword [last_password_len], r9
     mov rdi, custom_password_buffer
     mov rsi, r9
     call display_result
+    call vault_prompt
     jmp main_loop
 
 custom_empty_input:
@@ -625,7 +669,7 @@ custom_empty_input:
     jmp custom_length_input
 
 custom_no_charset:
-    ; aucun charset selectionne
+    ; aucun charset sélectionné
     mov rax, 1
     mov rdi, 1
     mov rsi, none_selected_msg
@@ -639,7 +683,7 @@ exit_program:
     xor rdi, rdi
     syscall
 
-; fonction d'affichage du resultat
+; fonction d'affichage du résultat
 ; rdi = pointer to password, rsi = length of password
 display_result:
     mov r8, rdi   ; sauvegarde du pointer
@@ -650,7 +694,7 @@ display_result:
     mov rsi, newline
     mov rdx, 1
     syscall
-    ; affichage du message de succes
+    ; affichage du message de succès
     mov rax, 1
     mov rdi, 1
     mov rsi, success_msg
@@ -680,3 +724,145 @@ display_result:
     mov rdx, 1
     syscall
     ret
+
+; --- Fonctionnalité Vault ---
+; Demande à l'utilisateur s'il veut sauvegarder le mot de passe, et si oui,
+; lui demande un nom et enregistre l'entrée dans vault_storage.
+vault_prompt:
+    cld  ; efface le flag de direction pour lodsb/stosb
+    ; affiche le prompt de sauvegarde
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, vault_save_prompt
+    mov rdx, vault_save_prompt_len
+    syscall
+
+    ; lecture de la réponse dans input_buffer
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, input_buffer
+    mov rdx, 16
+    syscall
+
+    ; suppression des sauts de ligne
+    mov rbx, rax
+    mov rdi, input_buffer
+vault_prompt_trim:
+    cmp rbx, 0
+    je vault_prompt_after_trim
+    cmp byte [rdi], 10
+    jne vault_prompt_not_newline
+    mov byte [rdi], 0
+vault_prompt_not_newline:
+    inc rdi
+    dec rbx
+    jmp vault_prompt_trim
+vault_prompt_after_trim:
+
+    ; vérifie si la réponse est "oui"
+    mov rdi, input_buffer
+    mov rsi, yes_str
+    mov rcx, yes_str_len
+    repe cmpsb
+    cmp rcx, 0
+    jne vault_prompt_end   ; si ce n'est pas "oui", on ne sauvegarde pas
+
+    ; demande le nom pour le mot de passe
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, vault_name_prompt
+    mov rdx, vault_name_prompt_len
+    syscall
+
+    ; lecture du nom dans name_input
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, name_input
+    mov rdx, 64
+    syscall
+
+    ; suppression des sauts de ligne dans le nom
+    mov rbx, rax
+    mov rdi, name_input
+vault_name_trim:
+    cmp rbx, 0
+    je vault_name_trim_done
+    cmp byte [rdi], 10
+    jne vault_name_not_newline
+    mov byte [rdi], 0
+vault_name_not_newline:
+    inc rdi
+    dec rbx
+    jmp vault_name_trim
+vault_name_trim_done:
+
+    ; Construction de l'entrée du vault : [nom] " : " [motdepasse] "\n"
+    ; Récupère l'offset courant dans vault_storage
+    mov rax, [vault_offset]
+    mov rdi, vault_storage
+    add rdi, rax
+
+    cld  ; s'assurer que DF est à 0
+    ; copie le nom depuis name_input
+    mov rsi, name_input
+vault_copy_name:
+    lodsb
+    cmp al, 0
+    je vault_copy_separator
+    stosb
+    jmp vault_copy_name
+
+vault_copy_separator:
+    mov rsi, separator_str
+vault_copy_sep_loop:
+    lodsb
+    cmp al, 0
+    je vault_copy_password
+    stosb
+    jmp vault_copy_sep_loop
+
+vault_copy_password:
+    ; copie le mot de passe depuis last_password_ptr (mot de passe déjà sauvegardé)
+    mov rsi, [last_password_ptr]
+    mov rcx, [last_password_len]
+vault_copy_pass_loop:
+    cmp rcx, 0
+    je vault_copy_newline
+    mov al, byte [rsi]
+    stosb
+    inc rsi
+    dec rcx
+    jmp vault_copy_pass_loop
+
+vault_copy_newline:
+    ; ajoute un saut de ligne à la fin de l'entrée
+    mov al, 10
+    stosb
+
+    ; mise à jour de vault_offset : nouvelle position = rdi - vault_storage
+    mov rax, vault_storage
+    sub rdi, rax
+    mov [vault_offset], rdi
+
+vault_prompt_end:
+    ret
+
+; Affiche toutes les entrées sauvegardées dans le vault
+show_vault:
+    mov rax, [vault_offset]
+    cmp rax, 0
+    jne vault_display
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, empty_vault_msg
+    mov rdx, empty_vault_msg_len
+    syscall
+    jmp main_loop
+
+vault_display:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, vault_storage
+    mov rdx, [vault_offset]
+    syscall
+    jmp main_loop
