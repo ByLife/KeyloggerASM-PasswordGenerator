@@ -4,7 +4,7 @@ Ce dépôt contient une collection d'outils de sécurité système développés 
 
 ## Video
 
-[![Vidéo de présentation](video.mp4)]
+[![Vidéo de présentation](./video.mp4)]
 
 ## Composants du projet
 
