@@ -28,7 +28,7 @@ Ces outils sont développés uniquement à des fins éducatives et de recherche 
 
 ## Auteurs
 
-- Luc Martin
+- Luc MARTIN
 - Léo HAIDAR
 
 ## Licence
@@ -37,4 +37,4 @@ Ce projet est fourni à titre éducatif uniquement. Aucune licence explicite n'e
 
 ---
 
-© 2025 - Luc Martin & Léo HAIDAR
+© 2025 - Luc MARTIN & Léo HAIDAR
