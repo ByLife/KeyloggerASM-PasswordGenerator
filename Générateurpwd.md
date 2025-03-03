@@ -8,9 +8,10 @@ Ce programme, écrit en NASM pour Linux (architecture x86_64), permet de génér
 - [Structure du code](#structure-du-code)
   - [Section .data](#section-data)
   - [Section .bss](#section-bss)
-  - [Section .text et les routines principales](#section-text-et-les-routines-principales)
+  - [Section .text et routines principales](#section-text-et-routines-principales)
 - [Compilation](#compilation)
 - [Exécution et utilisation](#exécution-et-utilisation)
+  - [Exécution](#exécution)
   - [Commandes disponibles](#commandes-disponibles)
   - [Gestion du Vault](#gestion-du-vault)
 - [Détails techniques](#détails-techniques)
@@ -20,82 +21,143 @@ Ce programme, écrit en NASM pour Linux (architecture x86_64), permet de génér
 
 ## Fonctionnalités
 
-- **Génération de mots de passe**  
-  Le programme propose quatre modes de génération :
-  - **Simple** : 8 caractères (lettres majuscules et minuscules, chiffres)
-  - **Medium** : 10 caractères (lettres, chiffres et quelques caractères spéciaux)
-  - **Hardcore** : 20 caractères (mélange de lettres, chiffres et caractères spéciaux)
-  - **Custom** : L'utilisateur peut définir la longueur du mot de passe et choisir d'inclure ou non des minuscules, majuscules, chiffres et caractères spéciaux.
+### Génération de mots de passe
 
-- **Sauvegarde persistante (Vault)**  
-  Après la génération d’un mot de passe, le programme propose de le sauvegarder avec un nom. L'entrée sauvegardée est stockée dans une zone mémoire et également ajoutée en fin de fichier (`vault.txt`).  
-  Au démarrage, le programme charge le contenu de ce fichier pour pouvoir afficher l’historique des mots de passe sauvegardés.
+Le programme offre plusieurs modes de génération :
 
-- **Gestion du Vault**  
-  - La commande `vault` affiche l'ensemble des entrées sauvegardées.
-  - La commande `vault delete` vide le fichier de sauvegarde et réinitialise le vault en mémoire.
+- **Simple** : 8 caractères (lettres et chiffres).
+- **Medium** : 10 caractères (incluant des caractères spéciaux).
+- **Hardcore** : 20 caractères (avec un mélange complet de lettres, chiffres et caractères spéciaux).
+- **Custom** : L'utilisateur définit la longueur et choisit quels types de caractères inclure (minuscules, majuscules, chiffres, spéciaux).
+
+### Sauvegarde persistante (Vault)
+
+Après chaque génération, l'utilisateur peut choisir de sauvegarder le mot de passe avec un nom personnalisé. Les entrées sont enregistrées en mémoire et ajoutées au fichier `vault.txt` pour être restaurées lors des exécutions futures.
+
+### Gestion du Vault
+
+- La commande `vault` affiche les mots de passe sauvegardés avec leur nom.
+- La commande `vault delete` vide le fichier de sauvegarde et réinitialise le vault en mémoire.
 
 ## Structure du code
 
-Le code est divisé en trois sections principales :
-
 ### Section .data
 
-Contient les constantes et chaînes de caractères utilisées par le programme, telles que :
+Cette section contient toutes les chaînes de caractères et constantes utilisées par le programme, notamment :
 
-- **Messages et invites :**  
-  - Message de bienvenue (`welcome_msg`)
-  - Liste des commandes disponibles (`commands_msg`)
-  - Invite de commande (`prompt_msg`)
-  - Messages d'erreur et de succès (par exemple, `success_msg`, `unknown_cmd_msg`)
+- **Messages d'accueil et d'instructions**
+  - `welcome_msg` : Message de bienvenue.
+  - `commands_msg` : Liste des commandes disponibles.
+  - `prompt_msg` : Invite pour saisir une commande.
+  - Messages d'erreur et de succès (ex. : `success_msg`, `unknown_cmd_msg`).
 
-- **Ensembles de caractères :**  
-  - Pour la génération des mots de passe simples, medium et hardcore (`allowed_chars`, `allowed_medium_chars`).
+- **Ensembles de caractères**
+  - `allowed_chars` pour le mode simple.
+  - `allowed_medium_chars` pour les modes medium et hardcore.
 
-- **Constantes pour la commande Vault :**  
-  - Noms de commandes (`vault_str`, `vault_delete_str`)
-  - Prompts spécifiques (pour sauvegarder et nommer un mot de passe, `vault_save_prompt` et `vault_name_prompt`)
-  - Messages pour afficher le vide du vault (`empty_vault_msg`, `vault_deleted_msg`)
+- **Commandes et invites spécifiques au Vault**
+  - `vault_str` pour afficher le vault.
+  - `vault_delete_str` pour la commande de suppression du vault.
+  - `vault_save_prompt` et `vault_name_prompt` pour la sauvegarde d'un mot de passe.
+  - Messages tels que `empty_vault_msg` et `vault_deleted_msg`.
 
 ### Section .bss
 
-Réserve de la mémoire pour les variables qui changent pendant l'exécution :
+Cette section réserve la mémoire pour :
 
-- **Buffers de lecture et de génération :**  
-  - `input_buffer` : pour la saisie utilisateur.
-  - Buffers pour les mots de passe générés (`simple_password_buffer`, `medium_password_buffer`, `hardcore_password_buffer`, `custom_password_buffer`).
+- **Buffers de saisie et de génération**
+  - `input_buffer` pour la lecture de la commande utilisateur.
+  - Buffers pour stocker les mots de passe générés.
 
-- **Variables de génération et stockage :**  
-  - `seed` : utilisé pour la génération pseudo-aléatoire.
-  - Zone de stockage du vault (`vault_storage`) et variable d'offset (`vault_offset`) pour gérer l'ajout des nouvelles entrées.
-  - Buffers pour le nom d'entrée et les informations sur le dernier mot de passe généré (`name_input`, `last_password_ptr`, `last_password_len`).
+- **Variables de contrôle et stockage**
+  - `seed` : Utilisé pour la génération pseudo-aléatoire.
+  - `vault_storage` : Zone mémoire pour stocker les entrées du vault.
+  - `vault_offset` : Indique la taille actuelle des données sauvegardées.
+  - `name_input` : Pour la saisie du nom associé à une entrée.
 
-### Section .text et les routines principales
+### Section .text et routines principales
 
-Cette section contient le code exécutable organisé en plusieurs routines :
-
-- **`_start`**  
-  Le point d'entrée du programme. Il charge le contenu du fichier vault via `load_vault`, affiche le message de bienvenue et la liste des commandes, puis entre dans la boucle principale (`main_loop`).
-
-- **Boucle principale (`main_loop`)**  
-  Affiche une invite, lit la commande de l'utilisateur et oriente vers la fonction appropriée en effectuant des comparaisons de chaînes.
-
-- **Routines de génération de mots de passe :**  
-  - `gen_simple`, `gen_medium`, `gen_hardcore` et `gen_custom` : Chacune de ces routines génère un mot de passe en fonction des paramètres souhaités. La génération utilise une méthode de type LCG (Linear Congruential Generator) combinée avec la valeur de `rdtsc` pour obtenir une source d'aléa.
-
-- **Gestion du Vault :**  
-  - `vault_prompt` : Après génération, cette routine demande si l'utilisateur souhaite sauvegarder le mot de passe. En cas de réponse positive, le programme demande un nom et construit une entrée au format `[nom] : [mot de passe]\n`. Cette entrée est ajoutée à la zone mémoire du vault et ensuite écrite dans le fichier via `vault_save_to_file`.
-  - `vault_save_to_file` : Ouvre le fichier `vault.txt` en mode append et écrit l'entrée sauvegardée. Les valeurs nécessaires (pointeur et taille) sont préservées dans des registres pour éviter d'être écrasées par l'appel système.
-  - `vault_delete` : Permet de vider le fichier en l'ouvrant en mode écriture avec troncation (O_TRUNC) et réinitialise le vault en mémoire. Un message de confirmation est affiché.
-  - `show_vault` et `vault_display` : Affichent le contenu du vault stocké en mémoire.
-
-- **Affichage du résultat (`display_result`)**  
-  Affiche le mot de passe généré ainsi que quelques sauts de ligne pour une meilleure lisibilité.
+- **Point d'entrée (`_start`)**
+- **Boucle principale (`main_loop`)**
+- **Routines de génération de mots de passe**
+- **Gestion du Vault**
+- **Affichage du résultat (`display_result`)**
 
 ## Compilation
 
-Pour compiler ce programme, utilisez NASM pour assembler le fichier source en format ELF64, puis liez l'objet généré avec ld :
+Assurez-vous que NASM et ld sont installés sur votre système Linux.
 
 ```bash
 nasm -f elf64 generateur.asm -o generateur.o
 ld generateur.o -o generateur
+```
+
+## Exécution et utilisation
+
+### Exécution
+
+Lancez le programme depuis le terminal :
+
+```bash
+./generateur
+```
+
+Au démarrage, le programme tente de charger le contenu du fichier `vault.txt` afin de restaurer les entrées sauvegardées.
+
+### Commandes disponibles
+
+| Commande       | Description |
+|---------------|-------------|
+| `simple`      | Génère un mot de passe de 8 caractères. |
+| `medium`      | Génère un mot de passe de 10 caractères. |
+| `hardcore`    | Génère un mot de passe de 20 caractères. |
+| `custom`      | Génération personnalisée avec choix de longueur et types de caractères. |
+| `vault`       | Affiche les mots de passe sauvegardés. |
+| `vault delete`| Vide le fichier vault.txt et réinitialise la mémoire. |
+| `help`        | Affiche la liste des commandes. |
+| `exit`        | Quitte le programme. |
+
+### Gestion du Vault
+
+Le vault est géré de deux manières :
+
+- **En mémoire** : Les entrées sont stockées dans `vault_storage`.
+- **Dans le fichier (`vault.txt`)** :
+  - Les entrées sont ajoutées en mode append.
+  - La commande `vault delete` ouvre le fichier en mode écriture avec troncation.
+
+## Détails techniques
+
+### Génération de nombres pseudo-aléatoires
+
+- **Utilisation de `rdtsc`** : Lecture du compteur de cycles du processeur.
+- **Algorithme LCG** : Génération d'une suite de nombres pseudo-aléatoires.
+
+### Appels système utilisés
+
+| Syscall     | Description |
+|------------|-------------|
+| `sys_read (0)`  | Lecture de l'entrée utilisateur. |
+| `sys_write (1)` | Affichage à l'écran et écriture dans le fichier. |
+| `sys_open (2)`  | Ouverture des fichiers en lecture ou écriture. |
+| `sys_close (3)` | Fermeture des fichiers ouverts. |
+| `sys_exit (60)` | Quitte le programme. |
+
+## Remarques et améliorations possibles
+
+### Robustesse et gestion d'erreurs
+
+Ajout de messages d'erreur plus détaillés pour chaque appel système.
+
+### Sécurité de la génération aléatoire
+
+L'utilisation de `/dev/urandom` serait plus sûre que `rdtsc` et LCG.
+
+### Interface utilisateur
+
+Possibilité d'améliorer la saisie utilisateur ou de développer une interface graphique.
+
+### Extension du Vault
+
+Le buffer actuel est de 1024 octets. Une gestion dynamique de la mémoire pourrait être envisagée.
+
