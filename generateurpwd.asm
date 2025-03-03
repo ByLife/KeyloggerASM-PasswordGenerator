@@ -14,104 +14,91 @@ section .data
     commands_msg_len equ $ - commands_msg
 
     ; prompt de commande
-    prompt_msg  db "Entrez une commande: "
+    prompt_msg db "Entrez une commande: ", 0
     prompt_msg_len equ $ - prompt_msg
 
     ; message de succes
-    success_msg db "Mot de passe généré !", 10
+    success_msg db "Mot de passe généré !", 10, 0
     success_msg_len equ $ - success_msg
 
     ; message commande inconnue
-    unknown_cmd_msg db "Commande inconnue !", 10, 10
+    unknown_cmd_msg db "Commande inconnue !", 10, 10, 0
     unknown_cmd_msg_len equ $ - unknown_cmd_msg
 
     newline db 10
 
     ; ensemble de caracteres pour simple
-    allowed_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    allowed_len equ $ - allowed_chars
+    allowed_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 0
+    allowed_len equ $ - allowed_chars - 1
 
     ; ensemble de caracteres pour medium et hardcore
-    allowed_medium_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()"
-    allowed_medium_chars_len equ $ - allowed_medium_chars
+    allowed_medium_chars db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()", 0
+    allowed_medium_chars_len equ $ - allowed_medium_chars - 1
 
-    ; chaines de commande
-    exit_str   db "exit"
-    exit_str_len equ $ - exit_str
+    exit_str   db "exit", 0
+    exit_str_len equ $ - exit_str - 1
 
-    simple_str db "simple"
-    simple_str_len equ $ - simple_str
+    simple_str db "simple", 0
+    simple_str_len equ $ - simple_str - 1
 
-    medium_str db "medium"
-    medium_str_len equ $ - medium_str
+    medium_str db "medium", 0
+    medium_str_len equ $ - medium_str - 1
 
-    hardcore_str db "hardcore"
-    hardcore_str_len equ $ - hardcore_str
+    hardcore_str db "hardcore", 0
+    hardcore_str_len equ $ - hardcore_str - 1
 
-    custom_str db "custom"
-    custom_str_len equ $ - custom_str
+    custom_str db "custom", 0
+    custom_str_len equ $ - custom_str - 1
 
-    help_str db "help"
-    help_str_len equ $ - help_str
+    help_str db "help", 0
+    help_str_len equ $ - help_str - 1
 
-    ; prompt pour la longueur custom
     custom_length_prompt db "Entrez la longueur du mot de passe custom: ", 0
     custom_length_prompt_len equ $ - custom_length_prompt
 
-    ; prompt pour inclure les lettres minuscules
     custom_lowercase_prompt db "Inclure des lettres minuscules ? (oui/non): ", 0
     custom_lowercase_prompt_len equ $ - custom_lowercase_prompt
 
-    ; prompt pour inclure les lettres majuscules
     custom_uppercase_prompt db "Inclure des lettres majuscules ? (oui/non): ", 0
     custom_uppercase_prompt_len equ $ - custom_uppercase_prompt
 
-    ; prompt pour inclure les nombres
     custom_numbers_prompt db "Inclure des nombres ? (oui/non): ", 0
     custom_numbers_prompt_len equ $ - custom_numbers_prompt
 
-    ; prompt pour inclure les caracteres speciaux
     custom_special_prompt db "Inclure des caracteres speciaux ? (oui/non): ", 0
     custom_special_prompt_len equ $ - custom_special_prompt
 
-    ; message aucun caractere selectionne
-    none_selected_msg db "Aucun caractere selectionne !", 10, 10
+    none_selected_msg db "Aucun caractere selectionne !", 10, 10, 0
     none_selected_msg_len equ $ - none_selected_msg
 
-    ; chaines pour oui et non
-    yes_str db "oui"
-    yes_str_len equ $ - yes_str
+    yes_str db "oui", 0
+    yes_str_len equ $ - yes_str - 1
 
-    non_str db "non"
-    non_str_len equ $ - non_str
+    non_str db "non", 0
+    non_str_len equ $ - non_str - 1
 
-    ; ensembles de caracteres pour custom
-    lowercase_chars db "abcdefghijklmnopqrstuvwxyz"
-    lowercase_chars_len equ $ - lowercase_chars
+    lowercase_chars db "abcdefghijklmnopqrstuvwxyz", 0
+    lowercase_chars_len equ $ - lowercase_chars - 1
 
-    uppercase_chars db "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    uppercase_chars_len equ $ - uppercase_chars
+    uppercase_chars db "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 0
+    uppercase_chars_len equ $ - uppercase_chars - 1
 
-    numbers_chars db "0123456789"
-    numbers_chars_len equ $ - numbers_chars
+    numbers_chars db "0123456789", 0
+    numbers_chars_len equ $ - numbers_chars - 1
 
-    special_chars db "!@#$%^&*()"
-    special_chars_len equ $ - special_chars
+    special_chars db "!@#$%^&*()", 0
+    special_chars_len equ $ - special_chars - 1
 
-    ; message d'erreur nombre invalide
     invalid_number_msg db "Ce n'est pas un nombre !", 10, 0
     invalid_number_msg_len equ $ - invalid_number_msg
 
-    ; message d'erreur champ vide pour nombre
     empty_number_msg db "Le champ ne doit pas etre vide !", 10, 0
     empty_number_msg_len equ $ - empty_number_msg
 
-    ; message d'erreur reponse invalide
     invalid_response_msg db "Reponse invalide !", 10, 0
     invalid_response_msg_len equ $ - invalid_response_msg
 
 section .bss
-    ; buffers pour la saisie et les mots de passe
     input_buffer resb 16
     simple_password_buffer resb 9
     medium_password_buffer resb 11
@@ -121,7 +108,7 @@ section .bss
     seed resq 1
 
 section .text
-    global _start
+    global _start, exit_program, display_result
 
 _start:
     ; affichage du message de bienvenue
@@ -146,7 +133,7 @@ main_loop:
     mov rdx, prompt_msg_len
     syscall
 
-    ; lecture de la commande entree par l'utilisateur
+    ; lecture de la commande entree
     mov rax, 0
     mov rdi, 0
     mov rsi, input_buffer
@@ -165,8 +152,7 @@ not_newline:
     dec rbx
     jmp trim_loop
 after_trim:
-
-    ; verification si la commande est exit
+    ; verification de la commande exit
     mov rdi, input_buffer
     mov rsi, exit_str
     mov rcx, exit_str_len
@@ -214,7 +200,7 @@ after_trim:
     cmp rcx, 0
     je print_help
 
-    ; affichage du message de commande inconnue
+    ; commande inconnue
     mov rax, 1
     mov rdi, 1
     mov rsi, unknown_cmd_msg
@@ -257,37 +243,10 @@ simple_loop:
     inc rsi
     loop simple_loop
     mov byte [rsi], 0
-    ; affichage du resultat simple
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, success_msg
-    mov rdx, success_msg_len
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, simple_password_buffer
-    mov rdx, 8
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
+    ; appel de la fonction d'affichage du resultat
+    mov rdi, simple_password_buffer
+    mov rsi, 8
+    call display_result
     jmp main_loop
 
 gen_medium:
@@ -316,37 +275,10 @@ medium_loop:
     inc rsi
     loop medium_loop
     mov byte [rsi], 0
-    ; affichage du resultat medium
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, success_msg
-    mov rdx, success_msg_len
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, medium_password_buffer
-    mov rdx, 10
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
+    ; appel de la fonction d'affichage du resultat
+    mov rdi, medium_password_buffer
+    mov rsi, 10
+    call display_result
     jmp main_loop
 
 gen_hardcore:
@@ -375,37 +307,10 @@ hardcore_loop:
     inc rsi
     loop hardcore_loop
     mov byte [rsi], 0
-    ; affichage du resultat hardcore
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, success_msg
-    mov rdx, success_msg_len
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, hardcore_password_buffer
-    mov rdx, 20
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
+    ; appel de la fonction d'affichage du resultat
+    mov rdi, hardcore_password_buffer
+    mov rsi, 20
+    call display_result
     jmp main_loop
 
 gen_custom:
@@ -504,7 +409,7 @@ lowercase_check:
     repe cmpsb
     cmp rcx, 0
     je set_lowercase_no
-    ; ce commantaire contient une faute intentionnelle
+    ; ce commantaire contient une faulte intentionelle
     mov rax, 1
     mov rdi, 1
     mov rsi, invalid_response_msg
@@ -671,13 +576,11 @@ set_special_yes:
     rep movsb
     mov r8, rdi
 set_special_no:
-
     ; verifie que le charset custom n'est pas vide
     mov rax, r8
     sub rax, custom_charset
     cmp rax, 0
     je custom_no_charset
-
     ; generation du mot de passe custom
     mov r10, rax
     rdtsc
@@ -706,37 +609,10 @@ custom_gen_loop:
     jmp custom_gen_loop
 custom_gen_done:
     mov byte [custom_password_buffer + rcx], 0
-    ; affichage du mot de passe custom genere
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, success_msg
-    mov rdx, success_msg_len
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, custom_password_buffer
-    mov rdx, r9
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, newline
-    mov rdx, 1
-    syscall
+    ; appel de la fonction d'affichage du resultat final
+    mov rdi, custom_password_buffer
+    mov rsi, r9
+    call display_result
     jmp main_loop
 
 custom_empty_input:
@@ -762,3 +638,45 @@ exit_program:
     mov rax, 60
     xor rdi, rdi
     syscall
+
+; fonction d'affichage du resultat
+; rdi = pointer to password, rsi = length of password
+display_result:
+    mov r8, rdi   ; sauvegarde du pointer
+    mov r9, rsi   ; sauvegarde de la longueur
+    ; affichage d'un saut de ligne
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+    ; affichage du message de succes
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, success_msg
+    mov rdx, success_msg_len
+    syscall
+    ; affichage d'un saut de ligne
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+    ; affichage du mot de passe
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, r8
+    mov rdx, r9
+    syscall
+    ; affichage de deux sauts de ligne
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+    ret
