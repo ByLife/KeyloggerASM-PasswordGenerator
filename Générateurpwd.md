@@ -108,9 +108,9 @@ Au démarrage, le programme tente de charger le contenu du fichier `vault.txt` a
 
 | Commande       | Description |
 |---------------|-------------|
-| `simple`      | Génère un mot de passe de 8 caractères. |
-| `medium`      | Génère un mot de passe de 10 caractères. |
-| `hardcore`    | Génère un mot de passe de 20 caractères. |
+| `simple`      | Génère un mot de passe de 8 caractères (Chiffres & lettres minuscules & majuscules). |
+| `medium`      | Génère un mot de passe de 10 caractères (Chiffres & lettres minuscules & majuscules + caractères spéciaux). |
+| `hardcore`    | Génère un mot de passe de 20 caractères (Chiffres & lettres minuscules & majuscules + caractères spéciaux). |
 | `custom`      | Génération personnalisée avec choix de longueur et types de caractères. |
 | `vault`       | Affiche les mots de passe sauvegardés. |
 | `vault delete`| Vide le fichier vault.txt et réinitialise la mémoire. |
@@ -124,7 +124,7 @@ Le vault est géré de deux manières :
 - **En mémoire** : Les entrées sont stockées dans `vault_storage`.
 - **Dans le fichier (`vault.txt`)** :
   - Les entrées sont ajoutées en mode append.
-  - La commande `vault delete` ouvre le fichier en mode écriture avec troncation.
+  - La commande `vault delete` ouvre le fichier en mode écriture avec troncation, et supprime le contenu du vault.txt.
 
 ## Détails techniques
 
