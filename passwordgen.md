@@ -9,6 +9,7 @@ Ce programme, écrit en NASM pour Linux (architecture x86_64), permet de génér
   - [Section .data](#section-data)
   - [Section .bss](#section-bss)
   - [Section .text et routines principales](#section-text-et-routines-principales)
+- [Schéma fonctionnel](#schéma-fonctionnel)
 - [Compilation](#compilation)
 - [Exécution et utilisation](#exécution-et-utilisation)
   - [Exécution](#exécution)
@@ -82,6 +83,33 @@ Cette section réserve la mémoire pour :
 - **Routines de génération de mots de passe**
 - **Gestion du Vault**
 - **Affichage du résultat (`display_result`)**
+
+## Schéma fonctionnel
+
+Le schéma ci-dessous illustre les interactions entre les différentes fonctions du générateur de mots de passe :
+
+![Schéma fonctionnel du générateur de mots de passe](pass_schema.png)
+
+### Explication du schéma
+
+Le schéma représente le flux d'exécution du programme avec les composants suivants :
+
+- **Point d'entrée et boucle principale** (bleu) : Les fonctions `_start` et `main_loop` qui contrôlent l'exécution.
+- **Fonctions de génération** (vert) : Les différents modes de génération de mots de passe (`gen_simple`, `gen_medium`, `gen_hardcore`, `gen_custom`).
+- **Fonctions d'affichage** (violet) : La fonction `display_result` qui montre le mot de passe généré.
+- **Fonctions liées au vault** (jaune) : Les fonctions qui gèrent la sauvegarde et l'affichage des mots de passe (`vault_prompt`, `vault_save_to_file`, `show_vault`, `vault_delete`, `load_vault`).
+- **Commandes diverses** (rouge) : Les fonctions `print_help` et `exit_program`.
+
+Le flux d'exécution est numéroté pour indiquer l'ordre des opérations :
+0. Chargement du vault depuis le fichier
+1. Initialisation et démarrage du programme
+2. Analyse de la commande utilisateur
+3. Affichage du mot de passe généré
+4. Proposition de sauvegarde
+5. Écriture dans le fichier vault
+6-9. Gestion des autres commandes
+
+Après chaque opération, le programme revient à la boucle principale (`main_loop`) pour attendre une nouvelle commande.
 
 ## Compilation
 
@@ -160,4 +188,3 @@ Possibilité d'améliorer la saisie utilisateur ou de développer une interface 
 ### Extension du Vault
 
 Le buffer actuel est de 1024 octets. Une gestion dynamique de la mémoire pourrait être envisagée.
-
