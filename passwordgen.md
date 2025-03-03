@@ -88,7 +88,8 @@ Cette section réserve la mémoire pour :
 
 Le schéma ci-dessous illustre les interactions entre les différentes fonctions du générateur de mots de passe :
 
-![Schéma fonctionnel du générateur de mots de passe](pass_schema.png)
+![image](https://github.com/user-attachments/assets/49467837-5235-451a-95fa-4b80f8b96a21)
+
 
 ### Explication du schéma
 
