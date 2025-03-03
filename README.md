@@ -4,7 +4,7 @@ Ce dépôt contient une collection d'outils de sécurité système développés 
 
 ## Video
 
-[![Watch the video](https://img.youtube.com/vi/T-D1KVIuvjA/maxresdefault.jpg)](https://youtu.be/T-D1KVIuvjA)
+[![Vidéo explicative](https://www.teachertube.com/dist/images/Default-Media-Video.png)](./video.mp4)
 
 
 ## Composants du projet
