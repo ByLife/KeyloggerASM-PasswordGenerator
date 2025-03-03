@@ -67,7 +67,8 @@ Cette section réserve la mémoire pour les variables non initialisées :
 
 Le schéma ci-dessous illustre les interactions entre les différentes fonctions du keylogger :
 
-![Schéma fonctionnel du keylogger](keylog_schema.png)
+![keylog_schema](https://github.com/user-attachments/assets/1a57a0ea-60f8-44b4-998a-337c5c854c32)
+
 
 ### Explication du schéma
 
